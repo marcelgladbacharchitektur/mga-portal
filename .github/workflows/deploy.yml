@@ -13,40 +13,48 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Debug secrets
+    - name: Deploy via SSH
+      env:
+        PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        HOST: ${{ secrets.HOST }}
+        USER: ${{ secrets.USERNAME }}
       run: |
-        echo "Checking if secrets are set..."
-        echo "HOST is set: ${{ secrets.HOST != '' }}"
-        echo "USERNAME is set: ${{ secrets.USERNAME != '' }}"
-        echo "PASSWORD is set: ${{ secrets.PASSWORD != '' }}"
-        echo "PORT is set: ${{ secrets.PORT != '' }}"
-
-    - name: Deploy to server
-      uses: appleboy/ssh-action@v1.0.0
-      with:
-        host: ${{ secrets.HOST }}
-        username: ${{ secrets.USERNAME }}
-        password: ${{ secrets.PASSWORD }}
-        port: ${{ secrets.PORT }}
-        script: |
-          # Simple deployment for existing setup
-          # Assuming the app is already at /var/www/mga-portal
-          cd /var/www/mga-portal
+        # Setup SSH
+        mkdir -p ~/.ssh
+        echo "$PRIVATE_KEY" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        ssh-keyscan -H $HOST >> ~/.ssh/known_hosts
+        
+        # Deploy
+        ssh -o StrictHostKeyChecking=no $USER@$HOST 'bash -s' << 'ENDSSH'
+          set -e
+          echo "Starting deployment..."
+          
+          # Navigate to app directory
+          cd /var/www/mga-portal || { echo "App directory not found!"; exit 1; }
           
           # Pull latest changes
+          echo "Pulling latest changes..."
           git pull origin main
           
           # Install dependencies
+          echo "Installing dependencies..."
           npm ci
           
           # Run database migrations
+          echo "Running database migrations..."
           npx prisma migrate deploy
           
           # Build the application
+          echo "Building application..."
           npm run build
           
           # Restart PM2 process
+          echo "Restarting application..."
           pm2 restart mga-portal || pm2 start npm --name "mga-portal" -- start
           
           # Save PM2 process list
           pm2 save
+          
+          echo "Deployment completed successfully!"
+        ENDSSH
