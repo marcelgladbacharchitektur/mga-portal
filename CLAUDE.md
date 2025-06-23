@@ -204,3 +204,7 @@ Potenzielle Erweiterungen:
 ## Philosophie
 
 "Das Portal ist wie ein guter Assistent: Es denkt mit, erinnert zur richtigen Zeit, und macht die richtigen Dinge einfach. Es ist der digitale Komplize, der Chaos in Ordnung verwandelt."
+
+## Deployment
+
+Das Portal wird automatisch über GitHub Actions deployed. Jeder Push auf den `main` Branch triggert eine automatische Bereitstellung auf dem Produktionsserver.
