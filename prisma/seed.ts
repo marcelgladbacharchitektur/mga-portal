@@ -1,10 +1,11 @@
 import { PrismaClient } from '@prisma/client';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
+import { randomUUID } from 'crypto';
 
 const prisma = new PrismaClient();
 
 async function main() {
-  const adminEmail = 'admin@mga-portal.de';
+  const adminEmail = 'admin@mga-portal.com';
   const temporaryPassword = 'MGA-Admin-2024!';
   
   // Hash das Passwort
@@ -13,11 +14,16 @@ async function main() {
   // Erstelle Admin-User
   const admin = await prisma.user.upsert({
     where: { email: adminEmail },
-    update: {},
+    update: {
+      role: 'ADMIN',
+    },
     create: {
+      id: randomUUID(),
       email: adminEmail,
       name: 'Admin',
       password: hashedPassword,
+      role: 'ADMIN',
+      updatedAt: new Date(),
     },
   });
 

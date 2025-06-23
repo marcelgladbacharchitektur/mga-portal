@@ -1,27 +1,13 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
+// This is your schema from your database
+// It helps you generate the data models and query the database with Prisma Client
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
-}
-
-// NextAuth.js models
-model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String    @unique
-  emailVerified DateTime?
-  password      String
-  image         String?
-  accounts      Account[]
-  sessions      Session[]
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  provider  = "postgresql"
+  url       = env("DATABASE_URL") // Verwende eine einzige URL
 }
 
 model Account {
@@ -37,10 +23,65 @@ model Account {
   scope             String?
   id_token          String?
   session_state     String?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refresh_token_expires_in Int?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
+}
+
+model ContactGroup {
+  id                 String               @id
+  name               String
+  category           String
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime
+  notes              String?
+  website            String?
+  Address            Address[]
+  contacts           Contact[]
+  EmailAddress       EmailAddress[]
+  Person             Person[]
+  PhoneNumber        PhoneNumber[]
+  ProjectParticipant ProjectParticipant[]
+  User               User?
+}
+
+model Project {
+  id                 String               @id
+  projectNumber      String               @unique
+  name               String
+  status             ProjectStatus        @default(ACTIVE)
+  budget             Float?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime
+  lastActivityAt     DateTime?
+  nextcloudPath      String?
+  cadastralCommunity String?
+  parcelNumber       String?
+  plotAddress        String?
+  plotArea           Float?
+  plotNotes          String?
+  projectSector      ProjectSector        @default(NEW_CONSTRUCTION)
+  projectType        ProjectType          @default(RESIDENTIAL)
+  registrationNumber String?
+  zoning             String?
+  landRegistry       String?
+  ProjectParticipant ProjectParticipant[]
+  Task               Task[]
+  TimeEntry          TimeEntry[]
+  TrackedPlan        TrackedPlan[]
+}
+
+model ProjectParticipant {
+  id             String       @id
+  role           String
+  createdAt      DateTime     @default(now())
+  projectId      String
+  contactGroupId String
+  ContactGroup   ContactGroup @relation(fields: [contactGroupId], references: [id], onDelete: Cascade)
+  Project        Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, contactGroupId, role])
 }
 
 model Session {
@@ -51,6 +92,73 @@ model Session {
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+model Task {
+  id        String       @id
+  createdAt DateTime     @default(now())
+  updatedAt DateTime
+  title     String
+  status    TaskStatus   @default(TODO)
+  priority  TaskPriority @default(MEDIUM)
+  dueDate   DateTime?
+  projectId String?
+  Project   Project?     @relation(fields: [projectId], references: [id])
+  TimeEntry TimeEntry[]
+}
+
+model User {
+  id                 String            @id
+  email              String            @unique
+  emailVerified      DateTime?
+  password           String?
+  name               String?
+  image              String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime
+  contactGroupId     String?           @unique
+  role               UserRole          @default(CLIENT)
+  googleAccessToken  String?
+  googleRefreshToken String?
+  googleTokenExpiry  DateTime?
+  Account            Account[]
+  Appointment        Appointment[]
+  Session            Session[]
+  TimeEntry          TimeEntry[]
+  Event              Event[]
+  ContactGroup       ContactGroup?     @relation(fields: [contactGroupId], references: [id])
+  CalendarSettings   CalendarSettings?
+  RegisteredCalendar RegisteredCalendar[]
+}
+
+model CalendarSettings {
+  id                 String   @id @default(uuid())
+  userId             String   @unique
+  blockerCalendarId  String?
+  infoCalendarIds    String[]
+  workingHours       Json?    @default("{\"monday\":[],\"tuesday\":[],\"wednesday\":[],\"thursday\":[],\"friday\":[],\"saturday\":[],\"sunday\":[]}")
+  bufferMinutes      Int      @default(30)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  User               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum CalendarRole {
+  BLOCKING
+  INFO
+}
+
+model RegisteredCalendar {
+  id               String       @id @default(uuid())
+  userId           String
+  googleCalendarId String
+  name             String
+  roleInPortal     CalendarRole @default(INFO)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  User             User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, googleCalendarId])
+}
+
 model VerificationToken {
   identifier String
   token      String   @unique
@@ -58,3 +166,267 @@ model VerificationToken {
 
   @@unique([identifier, token])
 }
+
+model Address {
+  id             String       @id
+  street         String
+  streetNumber   String?
+  postalCode     String
+  city           String
+  country        String       @default("Deutschland")
+  addressType    AddressType  @default(BUSINESS)
+  isPrimary      Boolean      @default(false)
+  contactGroupId String?
+  personId       String?
+  createdAt      DateTime     @default(now())
+  ContactGroup   ContactGroup? @relation(fields: [contactGroupId], references: [id], onDelete: Cascade)
+  Person         Person?       @relation(fields: [personId], references: [id], onDelete: Cascade)
+}
+
+model Appointment {
+  id                     String                   @id
+  title                  String
+  description            String?
+  startTime              DateTime
+  endTime                DateTime
+  location               String?
+  notes                  String?
+  createdAt              DateTime                 @default(now())
+  updatedAt              DateTime
+  createdById            String
+  User                   User                     @relation(fields: [createdById], references: [id])
+  AppointmentParticipant AppointmentParticipant[]
+}
+
+model AppointmentParticipant {
+  id              String      @id
+  appointmentId   String
+  participantType String
+  participantId   String
+  Appointment     Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+
+  @@unique([appointmentId, participantType, participantId])
+}
+
+model Contact {
+  id             String        @id
+  firstName      String
+  lastName       String
+  email          String?
+  phone          String?
+  company        String?
+  notes          String?
+  category       String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime
+  contactGroupId String?
+  contactGroup   ContactGroup? @relation(fields: [contactGroupId], references: [id])
+}
+
+model EmailAddress {
+  id             String        @id
+  email          String
+  emailType      EmailType     @default(WORK)
+  isPrimary      Boolean       @default(false)
+  contactGroupId String?
+  personId       String?
+  createdAt      DateTime      @default(now())
+  ContactGroup   ContactGroup? @relation(fields: [contactGroupId], references: [id], onDelete: Cascade)
+  Person         Person?       @relation(fields: [personId], references: [id], onDelete: Cascade)
+}
+
+model Person {
+  id             String         @id
+  firstName      String
+  lastName       String
+  title          String?
+  position       String?
+  department     String?
+  contactGroupId String
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime
+  Address        Address[]
+  EmailAddress   EmailAddress[]
+  ContactGroup   ContactGroup   @relation(fields: [contactGroupId], references: [id], onDelete: Cascade)
+  PhoneNumber    PhoneNumber[]
+}
+
+model PhoneNumber {
+  id             String        @id
+  number         String
+  phoneType      PhoneType     @default(WORK)
+  isPrimary      Boolean       @default(false)
+  contactGroupId String?
+  personId       String?
+  createdAt      DateTime      @default(now())
+  ContactGroup   ContactGroup? @relation(fields: [contactGroupId], references: [id], onDelete: Cascade)
+  Person         Person?       @relation(fields: [personId], references: [id], onDelete: Cascade)
+}
+
+model PlanVersion {
+  id            String      @id
+  versionNumber Int
+  filePath      String
+  description   String?
+  fileSize      Int?
+  uploadedAt    DateTime    @default(now())
+  uploadedBy    String?
+  trackedPlanId String
+  TrackedPlan   TrackedPlan @relation(fields: [trackedPlanId], references: [id], onDelete: Cascade)
+
+  @@unique([trackedPlanId, versionNumber])
+}
+
+model ShareLink {
+  id            String      @id
+  token         String      @unique
+  password      String?
+  expiresAt     DateTime?
+  createdAt     DateTime    @default(now())
+  lastAccessed  DateTime?
+  accessCount   Int         @default(0)
+  trackedPlanId String
+  TrackedPlan   TrackedPlan @relation(fields: [trackedPlanId], references: [id], onDelete: Cascade)
+}
+
+model TimeEntry {
+  id              String    @id
+  startTime       DateTime
+  endTime         DateTime?
+  durationMinutes Int?
+  description     String
+  isBillable      Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime
+  projectId       String?
+  taskId          String?
+  userId          String
+  Project         Project?  @relation(fields: [projectId], references: [id])
+  Task            Task?     @relation(fields: [taskId], references: [id])
+  User            User      @relation(fields: [userId], references: [id])
+}
+
+model TrackedPlan {
+  id          String        @id
+  title       String
+  description String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime
+  projectId   String
+  PlanVersion PlanVersion[]
+  ShareLink   ShareLink[]
+  Project     Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model Event {
+  id          String    @id @default(uuid())
+  title       String
+  description String?
+  startTime   DateTime
+  endTime     DateTime
+  location    String?
+  userId      String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  User        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum ProjectStatus {
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  ARCHIVED
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+  ARCHIVED
+}
+
+enum AddressType {
+  BUSINESS
+  PRIVATE
+  BILLING
+  SHIPPING
+}
+
+enum ContactCategory {
+  CLIENT
+  ARCHITECT
+  ENGINEER
+  CONTRACTOR
+  AUTHORITY
+  SUPPLIER
+  OTHER
+}
+
+enum EmailType {
+  WORK
+  PRIVATE
+  OTHER
+}
+
+enum PhoneType {
+  WORK
+  MOBILE
+  FAX
+  PRIVATE
+  OTHER
+}
+
+enum ProjectSector {
+  NEW_CONSTRUCTION
+  RENOVATION
+  EXTENSION
+  CONVERSION
+  RESTORATION
+  OTHER
+}
+
+enum ProjectType {
+  RESIDENTIAL
+  COMMERCIAL
+  PUBLIC
+  INDUSTRIAL
+  RENOVATION
+  OTHER
+}
+
+enum UserRole {
+  ADMIN
+  CLIENT
+  SERVICE
+}
+
+model AppointmentType {
+  id               String   @id @default(uuid())
+  name             String
+  durationMinutes  Int
+  description      String?
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  BookingToken     BookingToken[]
+}
+
+model BookingToken {
+  id                String          @id @default(uuid())
+  token             String          @unique
+  appointmentTypeId String
+  contactEmail      String
+  contactName       String?
+  expiresAt         DateTime
+  used              Boolean         @default(false)
+  createdAt         DateTime        @default(now())
+  appointmentType   AppointmentType @relation(fields: [appointmentTypeId], references: [id])
+}
+

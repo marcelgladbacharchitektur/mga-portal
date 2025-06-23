@@ -12,6 +12,9 @@
 
 # testing
 /coverage
+/test-results
+/playwright-report
+/playwright/.cache
 
 # next.js
 /.next/
@@ -39,3 +42,68 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# prisma
+prisma/dev.db
+prisma/dev.db-journal
+*.db
+*.db-journal
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# temporary files
+*.tmp
+*.temp
+*.log
+
+# test scripts and debug files
+test-*.ts
+test-*.js
+check-*.ts
+check-*.js
+debug-*.png
+*.png
+!src/app/icon.png
+
+# credentials and keys
+mga-cred.md
+*-cred.md
+*-credentials.md
+cookies.txt
+
+# migration files (keep only in migrations folder)
+/*.sql
+/add-*.sql
+/create-*.sql
+/fix-*.sql
+/migration*.sql
+/extend-*.sql
+/final-*.sql
+/check-*.sql
+
+# scripts and tools
+/scripts/
+/supabase/
+
+# backup and temporary schema files
+*.backup.prisma
+*.backup*.prisma
+schema-*.prisma
+SOLL-schema.prisma
+
+# documentation generated for deployment
+/GOOGLE-*.md
+/FIXES-*.md
+/MIGRATION_*.sql
+
+# sentry config
+sentry.*.config.ts
+
+# temporary auth scripts
+authorize-*.ts
+reset-*.ts
+create-test-*.ts

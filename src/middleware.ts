@@ -2,22 +2,12 @@ import { withAuth } from "next-auth/middleware";
 import { NextResponse } from "next/server";
 
 export default withAuth(
-  function middleware(req) {
+  function middleware() {
     return NextResponse.next();
   },
   {
     callbacks: {
-      authorized: ({ req, token }) => {
-        // Erlaube Zugriff auf Login-Seite ohne Authentifizierung
-        if (req.nextUrl.pathname.startsWith("/login")) {
-          return true;
-        }
-        
-        // Erlaube Zugriff auf API-Routen für NextAuth
-        if (req.nextUrl.pathname.startsWith("/api/auth")) {
-          return true;
-        }
-        
+      authorized: ({ token }) => {
         // Alle anderen Routen erfordern Authentifizierung
         return !!token;
       },
@@ -36,7 +26,16 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
+     * - api/test-dashboard (test endpoint)
+     * - api/calendar/debug (debug endpoint)
+     * - api/fix-admin-password (admin fix endpoint)
+     * - api/availability (public booking availability)
+     * - api/book-appointment (public booking)
+     * - api/booking-tokens (booking token validation)
+     * - api/test-availability (test endpoint)
+     * - buchung/* (public booking pages)
+     * - termin-buchen/* (public booking pages)
      */
-    "/((?!_next/static|_next/image|favicon.ico).*)",
+    "/((?!_next/static|_next/image|favicon.ico|api/calendar/debug|api/calendar/status|api/fix-admin-password|api/auth/temp-admin|api/availability|api/availability-test|api/book-appointment|api/booking-tokens|api/test-availability|buchung|termin-buchen).*)",
   ],
 };
