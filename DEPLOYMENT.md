@@ -15,8 +15,8 @@ You need to add the following secrets to your GitHub repository:
 - Description: Your server's IP address
 
 #### `USERNAME`
-- Value: `deploy`
-- Description: SSH username for deployment
+- Value: `root`
+- Description: SSH username for deployment (uses root to manage deploy user)
 
 #### `PORT`
 - Value: `22`

@@ -21,9 +21,41 @@ jobs:
         key: ${{ secrets.SSH_KEY }}
         port: ${{ secrets.PORT }}
         script: |
+          # Check if deploy user exists, if not create it
+          if ! id -u deploy > /dev/null 2>&1; then
+            useradd -m -s /bin/bash deploy
+            usermod -aG sudo deploy
+            mkdir -p /home/deploy/.ssh
+            echo "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIImufWHuLlVNjQFxGh7jhywL85DvoRnOy/PVLKjVOwPq github-actions" > /home/deploy/.ssh/authorized_keys
+            chown -R deploy:deploy /home/deploy/.ssh
+            chmod 700 /home/deploy/.ssh
+            chmod 600 /home/deploy/.ssh/authorized_keys
+          fi
+          
+          # Check if repository exists
+          if [ ! -d "/home/deploy/mga-portal/.git" ]; then
+            mkdir -p /home/deploy/mga-portal
+            chown -R deploy:deploy /home/deploy
+            cd /home/deploy
+            sudo -u deploy git clone https://github.com/marcelgladbacharchitektur/mga-portal.git
+          fi
+          
+          # Deploy as deploy user
           cd /home/deploy/mga-portal
-          git pull origin main
-          npm ci --production
-          npx prisma migrate deploy
-          npm run build
-          pm2 restart mga-portal
+          sudo -u deploy git pull origin main
+          sudo -u deploy npm ci --production
+          sudo -u deploy npx prisma migrate deploy
+          sudo -u deploy npm run build
+          
+          # Check if PM2 is installed
+          if ! command -v pm2 &> /dev/null; then
+            npm install -g pm2
+          fi
+          
+          # Restart or start the application
+          if pm2 list | grep -q "mga-portal"; then
+            sudo -u deploy pm2 restart mga-portal
+          else
+            sudo -u deploy pm2 start npm --name "mga-portal" -- start
+            sudo -u deploy pm2 save
+          fi
