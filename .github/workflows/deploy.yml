@@ -13,20 +13,38 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
+    - name: Install SSH client
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y openssh-client
+
     - name: Deploy via SSH
       env:
         PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
         HOST: ${{ secrets.HOST }}
         USER: ${{ secrets.USERNAME }}
       run: |
-        # Setup SSH
+        # Setup SSH with proper key format
         mkdir -p ~/.ssh
-        echo "$PRIVATE_KEY" > ~/.ssh/id_rsa
-        chmod 600 ~/.ssh/id_rsa
-        ssh-keyscan -H $HOST >> ~/.ssh/known_hosts
+        echo "$PRIVATE_KEY" > ~/.ssh/deploy_key
+        chmod 600 ~/.ssh/deploy_key
         
-        # Deploy
-        ssh -o StrictHostKeyChecking=no $USER@$HOST 'bash -s' << 'ENDSSH'
+        # Add host to known hosts
+        ssh-keyscan -H $HOST >> ~/.ssh/known_hosts 2>/dev/null
+        
+        # Test key format
+        echo "Testing SSH key..."
+        ssh-keygen -y -f ~/.ssh/deploy_key > ~/.ssh/deploy_key.pub || {
+          echo "Invalid SSH key format!"
+          echo "Make sure the SSH_PRIVATE_KEY secret contains the full private key including:"
+          echo "-----BEGIN OPENSSH PRIVATE KEY-----"
+          echo "...key content..."
+          echo "-----END OPENSSH PRIVATE KEY-----"
+          exit 1
+        }
+        
+        # Deploy using the key
+        ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no $USER@$HOST 'bash -s' << 'ENDSSH'
           set -e
           echo "Starting deployment..."
           
