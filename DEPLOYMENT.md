@@ -16,23 +16,15 @@ You need to add the following secrets to your GitHub repository:
 
 #### `USERNAME`
 - Value: `root`
-- Description: SSH username for deployment (uses root to manage deploy user)
+- Description: SSH username for deployment
+
+#### `PASSWORD`
+- Value: (your root password)
+- Description: SSH password for root user
 
 #### `PORT`
 - Value: `22`
 - Description: SSH port (default: 22)
-
-#### `SSH_KEY`
-- Value: (paste the entire private key below, including BEGIN and END lines)
-```
------BEGIN OPENSSH PRIVATE KEY-----
-b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
-QyNTUxOQAAACCJrn1h7i5VTY0BcRoe44csC/OQ76EZzsvz1Syo1TsD6gAAAJjwQaa/8EGm
-vwAAAAtzc2gtZWQyNTUxOQAAACCJrn1h7i5VTY0BcRoe44csC/OQ76EZzsvz1Syo1TsD6g
-AAAEC9e3aVmBycKMDoC7neCoQMldF4wGMNLh+vE5UZQyw3uYmufWHuLlVNjQFxGh7jhywL
-85DvoRnOy/PVLKjVOwPqAAAADmdpdGh1Yi1hY3Rpb25zAQIDBAUGBw==
------END OPENSSH PRIVATE KEY-----
-```
 
 ## Server Setup (First Time Only)
 
