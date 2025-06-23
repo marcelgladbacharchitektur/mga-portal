@@ -208,3 +208,5 @@ Potenzielle Erweiterungen:
 ## Deployment
 
 Das Portal wird automatisch über GitHub Actions deployed. Jeder Push auf den `main` Branch triggert eine automatische Bereitstellung auf dem Produktionsserver.
+
+Letztes Update: 23.06.2025 09:52
