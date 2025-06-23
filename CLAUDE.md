@@ -16,7 +16,6 @@
 - **Authentifizierung**: NextAuth.js mit Credentials Provider
 - **UI-Komponenten**: Headless UI
 - **Icons**: Lucide React
-- **Externe Dienste**: Nextcloud (WebDAV)
 
 ## Wichtige Befehle
 
@@ -78,7 +77,6 @@ npm run build
 ### 3. Projektverwaltung
 - Automatische Projektnummer-Generierung (YY-NNN Format)
 - Status-Tracking (ACTIVE, ON_HOLD, COMPLETED, ARCHIVED)
-- Nextcloud-Integration für automatische Ordnererstellung
 
 ### 4. Aufgabenverwaltung
 - Prioritäten (NIEDRIG, MITTEL, HOCH)
@@ -95,19 +93,6 @@ npm run build
 - Dropdown mit Optionen für Aufgaben, Projekte, Kontakte
 - Modal-Dialoge für Dateneingabe
 
-### 7. Nextcloud-Integration
-- Automatische Ordnererstellung bei Projekterstellung
-- Vordefinierte Ordnerstruktur:
-  - 01_Admin
-  - 02_Pläne
-  - 03_Korrespondenz
-  - 04_Fotos
-  - 05_Berechnungen
-  - 06_Ausschreibung
-  - 07_Verträge
-  - 08_Protokolle
-- README.md mit Projektinformationen
-- Status-Anzeige mit Verbindungstest
 
 ## Umgebungsvariablen
 
@@ -125,10 +110,6 @@ DATABASE_URL_DIRECT=postgresql://...
 NEXT_PUBLIC_SUPABASE_URL=https://...
 NEXT_PUBLIC_SUPABASE_ANON_KEY=...
 
-# Nextcloud
-NEXTCLOUD_URL=https://nextcloud.example.com
-NEXTCLOUD_USER=your-nextcloud-username
-NEXTCLOUD_APP_PASSWORD=your-nextcloud-app-password
 ```
 
 ## Design-Prinzipien
@@ -161,8 +142,7 @@ NEXTCLOUD_APP_PASSWORD=your-nextcloud-app-password
 ## Bekannte Einschränkungen
 
 1. Direkte Supabase-Verbindung erfordert manuelle SQL-Ausführung
-2. Nextcloud-Konfiguration muss manuell in .env eingetragen werden
-3. Keine Push-Benachrichtigungen implementiert
+2. Keine Push-Benachrichtigungen implementiert
 
 ## Server-Infrastruktur
 
@@ -175,8 +155,6 @@ NEXTCLOUD_APP_PASSWORD=your-nextcloud-app-password
 
 ### Services
 - **Portal**: https://portal.marcelgladbach.at
-- **Nextcloud**: https://cloud.marcelgladbach.at
-  - Admin: admin / tazqoP-2rapsa-vyhsyr
 - **Analytics**: https://analytics.marcelgladbach.at
 - **Status**: https://status.marcelgladbach.at
 
