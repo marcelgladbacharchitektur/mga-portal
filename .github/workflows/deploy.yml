@@ -13,6 +13,14 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
+    - name: Debug secrets
+      run: |
+        echo "Checking if secrets are set..."
+        echo "HOST is set: ${{ secrets.HOST != '' }}"
+        echo "USERNAME is set: ${{ secrets.USERNAME != '' }}"
+        echo "PASSWORD is set: ${{ secrets.PASSWORD != '' }}"
+        echo "PORT is set: ${{ secrets.PORT != '' }}"
+
     - name: Deploy to server
       uses: appleboy/ssh-action@v1.0.0
       with:
