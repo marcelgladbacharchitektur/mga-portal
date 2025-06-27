@@ -4,6 +4,23 @@ import { env } from '$env/dynamic/private';
 // Für lokale Entwicklung: OAuth2 mit persönlichem Google Account
 // Für Produktion: Service Account (wenn möglich) oder OAuth2
 
+export function initializeGoogleAuth(accessToken?: string, refreshToken?: string) {
+  const oauth2Client = new google.auth.OAuth2(
+    env.GOOGLE_CLIENT_ID,
+    env.GOOGLE_CLIENT_SECRET,
+    env.GOOGLE_REDIRECT_URI || 'http://localhost:5173/api/auth/google/callback'
+  );
+  
+  if (accessToken) {
+    oauth2Client.setCredentials({
+      access_token: accessToken,
+      refresh_token: refreshToken
+    });
+  }
+  
+  return oauth2Client;
+}
+
 export function getGoogleAuth() {
   // Option 1: Service Account (wenn verfügbar)
   if (env.GOOGLE_SERVICE_ACCOUNT_JSON) {

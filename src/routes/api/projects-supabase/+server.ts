@@ -20,7 +20,7 @@ export const GET: RequestHandler = async () => {
   }
 };
 
-export const POST: RequestHandler = async ({ request }) => {
+export const POST: RequestHandler = async ({ request, cookies }) => {
   try {
     const data = await request.json();
     const supabase = getSupabaseClient();
@@ -58,8 +58,22 @@ export const POST: RequestHandler = async ({ request }) => {
     
     // Create Google Drive folder, Calendar, and Tasks list
     try {
-      const { getGoogleServices } = await import('$lib/server/google-oauth');
-      const { drive, calendar, tasks } = getGoogleServices();
+      // Get Google auth tokens from cookies
+      const accessToken = cookies.get('google_access_token');
+      const refreshToken = cookies.get('google_refresh_token');
+      
+      if (!accessToken) {
+        console.log('No Google access token, skipping Google integrations');
+        return json(project);
+      }
+      
+      const { initializeGoogleAuth } = await import('$lib/server/google-oauth');
+      const auth = initializeGoogleAuth(accessToken, refreshToken);
+      const { google } = await import('googleapis');
+      
+      const drive = google.drive({ version: 'v3', auth });
+      const calendar = google.calendar({ version: 'v3', auth });
+      const tasks = google.tasks({ version: 'v1', auth });
       
       // Create Drive folder
       const folderResponse = await drive.files.create({

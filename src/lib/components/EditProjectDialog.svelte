@@ -1,8 +1,10 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
   import { X } from 'phosphor-svelte';
+  import type { Project } from '$lib/types';
   
   export let open = false;
+  export let project: Project | null = null;
   
   const dispatch = createEventDispatcher();
   
@@ -17,32 +19,35 @@
   let loading = false;
   let error = '';
   
+  $: if (project && open) {
+    formData = {
+      name: project.name,
+      cadastral_community: project.cadastral_community || '',
+      plot_area: project.plot_area?.toString() || '',
+      budget_hours: project.budget_hours?.toString() || '',
+      status: project.status
+    };
+  }
+  
   async function handleSubmit() {
+    if (!project) return;
+    
     loading = true;
     error = '';
     
     try {
-      const response = await fetch('/api/projects-supabase', {
-        method: 'POST',
+      const response = await fetch(`/api/projects-supabase/${project.id}`, {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
       });
       
       if (!response.ok) {
-        throw new Error('Failed to create project');
+        throw new Error('Failed to update project');
       }
       
-      const project = await response.json();
-      dispatch('created', project);
-      
-      // Reset form
-      formData = {
-        name: '',
-        cadastral_community: '',
-        plot_area: '',
-        budget_hours: '',
-        status: 'ACTIVE'
-      };
+      const updatedProject = await response.json();
+      dispatch('updated', updatedProject);
       open = false;
     } catch (err) {
       error = err instanceof Error ? err.message : 'Unknown error';
@@ -56,10 +61,18 @@
   }
 </script>
 
-{#if open}
+{#if open && project}
   <div class="fixed inset-0 bg-ink/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
     <div class="bg-white rounded-lg max-w-md w-full p-6 shadow-xl border border-ink/5">
-      <h2 class="text-2xl font-bold mb-4">Neues Projekt erstellen</h2>
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-2xl font-bold">Projekt bearbeiten</h2>
+        <button
+          on:click={handleClose}
+          class="p-2 rounded-lg hover:bg-ink/5 transition-colors"
+        >
+          <X size={20} class="text-ink/60" />
+        </button>
+      </div>
       
       {#if error}
         <div class="bg-red-100/50 border border-red-400/50 text-red-700 px-4 py-3 rounded mb-4">
@@ -69,67 +82,63 @@
       
       <form on:submit|preventDefault={handleSubmit} class="space-y-4">
         <div>
-          <label for="name" class="block text-sm font-medium text-ink mb-1">
+          <label for="edit-name" class="block text-sm font-medium text-ink mb-1">
             Projektname *
           </label>
           <input
-            id="name"
+            id="edit-name"
             type="text"
             bind:value={formData.name}
             required
             class="w-full px-3 py-2 border border-ink/20 rounded-md focus:outline-none focus:ring-2 focus:ring-accent-green/50 focus:border-accent-green"
-            placeholder="z.B. Einfamilienhaus Müller"
           />
         </div>
         
         <div>
-          <label for="cadastral_community" class="block text-sm font-medium text-ink mb-1">
+          <label for="edit-cadastral" class="block text-sm font-medium text-ink mb-1">
             Katastralgemeinde
           </label>
           <input
-            id="cadastral_community"
+            id="edit-cadastral"
             type="text"
             bind:value={formData.cadastral_community}
             class="w-full px-3 py-2 border border-ink/20 rounded-md focus:outline-none focus:ring-2 focus:ring-accent-green/50 focus:border-accent-green"
-            placeholder="z.B. Innsbruck"
           />
         </div>
         
         <div class="grid grid-cols-2 gap-4">
           <div>
-            <label for="plot_area" class="block text-sm font-medium text-ink mb-1">
+            <label for="edit-plot" class="block text-sm font-medium text-ink mb-1">
               Grundstücksfläche (m²)
             </label>
             <input
-              id="plot_area"
+              id="edit-plot"
               type="number"
               step="0.01"
               bind:value={formData.plot_area}
               class="w-full px-3 py-2 border border-ink/20 rounded-md focus:outline-none focus:ring-2 focus:ring-accent-green/50 focus:border-accent-green"
-              placeholder="z.B. 850"
             />
           </div>
           
           <div>
-            <label for="budget_hours" class="block text-sm font-medium text-ink mb-1">
+            <label for="edit-hours" class="block text-sm font-medium text-ink mb-1">
               Budget (Stunden)
             </label>
             <input
-              id="budget_hours"
+              id="edit-hours"
               type="number"
               bind:value={formData.budget_hours}
               class="w-full px-3 py-2 border border-ink/20 rounded-md focus:outline-none focus:ring-2 focus:ring-accent-green/50 focus:border-accent-green"
-              placeholder="z.B. 120"
             />
           </div>
         </div>
         
         <div>
-          <label for="status" class="block text-sm font-medium text-ink mb-1">
+          <label for="edit-status" class="block text-sm font-medium text-ink mb-1">
             Status
           </label>
           <select
-            id="status"
+            id="edit-status"
             bind:value={formData.status}
             class="w-full px-3 py-2 border border-ink/20 rounded-md focus:outline-none focus:ring-2 focus:ring-accent-green/50 focus:border-accent-green"
           >
@@ -153,7 +162,7 @@
             disabled={loading || !formData.name}
             class="px-4 py-2 bg-accent-green text-white rounded-md hover:bg-accent-green/90 transition-colors disabled:bg-ink/30"
           >
-            {loading ? 'Erstelle...' : 'Projekt erstellen'}
+            {loading ? 'Speichere...' : 'Speichern'}
           </button>
         </div>
       </form>
