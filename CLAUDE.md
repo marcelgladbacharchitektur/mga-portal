@@ -90,7 +90,10 @@ npm run check      # Run svelte-check
 4. ✅ Consistent design system implemented
 5. ✅ Google Tasks integration added
 6. ✅ Project search and list/grid view toggle
-7. ⚠️ Google OAuth needs proper setup in Google Cloud Console
+7. ✅ Enhanced Google Drive API error handling
+8. ✅ Added OAuth debug page at `/auth/debug`
+9. ✅ Expanded Drive API scopes for better access
+10. ⚠️ Google OAuth needs proper setup in Google Cloud Console
 
 ## API Endpoints
 - `/api/projects-supabase` - Project CRUD
@@ -99,6 +102,7 @@ npm run check      # Run svelte-check
 - `/api/tasks` - Google Tasks integration
 - `/api/shortcuts` - Apple Shortcuts integration
 - `/api/auth/google?action=login` - OAuth login
+- `/api/auth/google/debug` - OAuth debug info
 - `/auth/callback` - OAuth callback (page route)
 - `/api/projects/[id]/drive` - Google Drive browser
 
@@ -110,6 +114,18 @@ npm run check      # Run svelte-check
 5. Add redirect URI: `http://localhost:5173/auth/callback`
 6. Update .env with Client ID and Secret
 
+### Required OAuth Scopes
+- `https://www.googleapis.com/auth/drive` - Full Drive access
+- `https://www.googleapis.com/auth/drive.readonly` - Read Drive files
+- `https://www.googleapis.com/auth/drive.file` - Manage files created by app
+- `https://www.googleapis.com/auth/calendar` - Calendar access
+- `https://www.googleapis.com/auth/tasks` - Tasks access
+- `https://www.googleapis.com/auth/userinfo.email` - User email
+- `https://www.googleapis.com/auth/userinfo.profile` - User profile
+
 ## Known Issues
 - Google OAuth must be configured in Google Cloud Console before Drive/Tasks features work
 - Server must be restarted after .env changes
+- Drive folder access requires re-authentication if scopes change
+- 403 errors may occur if Drive files/folders aren't shared with the authenticated account
+- User must accept all requested permissions during OAuth flow for full functionality

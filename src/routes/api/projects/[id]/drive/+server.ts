@@ -37,6 +37,30 @@ export const GET: RequestHandler = async ({ params, url, cookies }) => {
     const auth = initializeGoogleAuth(accessToken, refreshToken);
     const drive = google.drive({ version: 'v3', auth });
     
+    // First, check if we have access to the folder
+    try {
+      const folderToCheck = folderId || projectFolderId;
+      console.log('Checking access to folder:', folderToCheck);
+      
+      // Try to get folder metadata first
+      const folderInfo = await drive.files.get({
+        fileId: folderToCheck,
+        fields: 'id, name, mimeType, permissions'
+      });
+      
+      console.log('Folder info:', folderInfo.data);
+    } catch (folderError: any) {
+      console.error('Folder access check failed:', folderError);
+      if (folderError.code === 404) {
+        return json({ error: 'Ordner nicht gefunden' }, { status: 404 });
+      } else if (folderError.code === 403) {
+        return json({ 
+          error: 'Sie haben keinen Zugriff auf diesen Ordner. Bitte stellen Sie sicher, dass der Ordner mit Ihrem Google-Account geteilt wurde.',
+          details: folderError.message 
+        }, { status: 403 });
+      }
+    }
+    
     // Build query
     let query = `'${folderId || projectFolderId}' in parents and trashed = false`;
     if (search) {
@@ -48,12 +72,56 @@ export const GET: RequestHandler = async ({ params, url, cookies }) => {
       q: query,
       fields: 'files(id, name, mimeType, size, modifiedTime, webViewLink, webContentLink, thumbnailLink, iconLink, parents)',
       orderBy: 'folder,name',
-      pageSize: 100
+      pageSize: 100,
+      supportsAllDrives: true,
+      includeItemsFromAllDrives: true
     });
     
     return json({ files: response.data.files || [] });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching Drive files:', error);
-    return json({ error: 'Failed to fetch files' }, { status: 500 });
+    console.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      status: error.status,
+      errors: error.errors,
+      response: error.response?.data
+    });
+    
+    if (error.code === 401) {
+      return json({ 
+        error: 'Authentifizierung fehlgeschlagen. Bitte melden Sie sich erneut mit Google an.',
+        needsReauth: true 
+      }, { status: 401 });
+    }
+    
+    if (error.code === 403) {
+      // Check specific error reasons
+      const errorMessage = error.message || '';
+      if (errorMessage.includes('insufficientPermissions')) {
+        return json({ 
+          error: 'Unzureichende Berechtigungen. Bitte stellen Sie sicher, dass Sie die erforderlichen Drive-Berechtigungen erteilt haben.',
+          details: error.message,
+          needsReauth: true
+        }, { status: 403 });
+      }
+      
+      return json({ 
+        error: 'Zugriff verweigert. Der Ordner muss mit Ihrem Google-Account geteilt sein.',
+        details: error.message 
+      }, { status: 403 });
+    }
+    
+    if (error.code === 404) {
+      return json({ 
+        error: 'Ordner nicht gefunden. Möglicherweise wurde er gelöscht oder die URL ist ungültig.',
+        details: error.message 
+      }, { status: 404 });
+    }
+    
+    return json({ 
+      error: 'Fehler beim Abrufen der Dateien',
+      details: error.message 
+    }, { status: 500 });
   }
 };

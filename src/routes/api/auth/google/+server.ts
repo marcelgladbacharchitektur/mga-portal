@@ -5,6 +5,8 @@ import { GOOGLE_CLIENT_ID, GOOGLE_REDIRECT_URI } from '$env/static/private';
 const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const SCOPES = [
   'https://www.googleapis.com/auth/drive',
+  'https://www.googleapis.com/auth/drive.readonly',
+  'https://www.googleapis.com/auth/drive.file',
   'https://www.googleapis.com/auth/calendar',
   'https://www.googleapis.com/auth/tasks',
   'https://www.googleapis.com/auth/userinfo.email',

@@ -64,6 +64,18 @@
           error = 'Nicht mit Google verbunden. Bitte melden Sie sich zuerst mit Google an.';
           return;
         }
+        if (response.status === 403) {
+          if (errorData.needsReauth) {
+            error = errorData.error + '\n\nBitte melden Sie sich erneut mit Google an, um die erforderlichen Berechtigungen zu erteilen.';
+          } else {
+            error = errorData.error + '\n\nDetails: ' + (errorData.details || 'Keine weiteren Details verfügbar');
+          }
+          return;
+        }
+        if (response.status === 404) {
+          error = errorData.error || 'Ordner nicht gefunden';
+          return;
+        }
         throw new Error(errorData.error || 'Failed to load files');
       }
       
@@ -206,13 +218,13 @@
     </div>
   {:else if error}
     <div class="bg-red-100/50 border border-red-400/50 text-red-700 px-4 py-3 rounded">
-      <p class="font-medium">Fehler: {error}</p>
-      {#if error.includes('Google')}
+      <p class="font-medium whitespace-pre-line">{error}</p>
+      {#if error.includes('Google') || error.includes('Berechtigungen')}
         <a 
           href="/api/auth/google?action=login" 
-          class="inline-block mt-2 px-3 py-1 bg-red-700 text-white rounded text-sm hover:bg-red-800 transition-colors"
+          class="inline-block mt-3 px-4 py-2 bg-accent-green text-white rounded-lg hover:bg-accent-green/90 transition-colors"
         >
-          Mit Google anmelden
+          Erneut mit Google anmelden
         </a>
       {/if}
     </div>

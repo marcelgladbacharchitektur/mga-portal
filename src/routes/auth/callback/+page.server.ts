@@ -23,7 +23,18 @@ export const load: PageServerLoad = async ({ url, cookies }) => {
   }
   
   try {
+    console.log('OAuth2 Client Config:', {
+      clientId: GOOGLE_CLIENT_ID,
+      clientSecret: GOOGLE_CLIENT_SECRET ? 'SET' : 'MISSING',
+      redirectUri: GOOGLE_REDIRECT_URI
+    });
+    
     const { tokens } = await oauth2Client.getToken(code);
+    
+    console.log('Tokens received:', {
+      hasAccessToken: !!tokens.access_token,
+      hasRefreshToken: !!tokens.refresh_token
+    });
     
     // Store tokens in cookies
     if (tokens.access_token) {
@@ -48,8 +59,9 @@ export const load: PageServerLoad = async ({ url, cookies }) => {
     
     // Redirect back to projects page
     throw redirect(303, '/projekte?auth_success=true');
-  } catch (error) {
+  } catch (error: any) {
     console.error('Token exchange error:', error);
+    console.error('Error details:', error.response?.data || error.message);
     throw redirect(303, '/projekte?auth_error=token_exchange_failed');
   }
 };
