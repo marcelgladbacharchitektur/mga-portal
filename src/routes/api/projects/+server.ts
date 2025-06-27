@@ -2,15 +2,19 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { google } from 'googleapis';
 import { getGoogleAuth } from '$lib/server/google-auth';
-import { GOOGLE_SPREADSHEET_ID } from '$env/static/private';
+import { env } from '$env/dynamic/private';
 
 export const GET: RequestHandler = async () => {
   try {
+    if (!env.GOOGLE_SPREADSHEET_ID) {
+      throw new Error('GOOGLE_SPREADSHEET_ID is not set');
+    }
+    
     const auth = getGoogleAuth();
     const sheets = google.sheets({ version: 'v4', auth });
 
     const response = await sheets.spreadsheets.values.get({
-      spreadsheetId: GOOGLE_SPREADSHEET_ID,
+      spreadsheetId: env.GOOGLE_SPREADSHEET_ID,
       range: 'Projekte!A:K',
     });
 
@@ -52,7 +56,7 @@ export const POST: RequestHandler = async ({ request }) => {
     // Generate project ID (YY-NNN format)
     const year = new Date().getFullYear().toString().slice(-2);
     const existingProjects = await sheets.spreadsheets.values.get({
-      spreadsheetId: GOOGLE_SPREADSHEET_ID,
+      spreadsheetId: env.GOOGLE_SPREADSHEET_ID,
       range: 'Projekte!A:A',
     });
     const count = (existingProjects.data.values?.length || 0);
@@ -98,7 +102,7 @@ export const POST: RequestHandler = async ({ request }) => {
 
     // Add to spreadsheet
     await sheets.spreadsheets.values.append({
-      spreadsheetId: GOOGLE_SPREADSHEET_ID,
+      spreadsheetId: env.GOOGLE_SPREADSHEET_ID,
       range: 'Projekte!A:K',
       valueInputOption: 'USER_ENTERED',
       requestBody: {
