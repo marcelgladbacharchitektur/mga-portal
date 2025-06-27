@@ -21,7 +21,7 @@
 
   onMount(async () => {
     try {
-      const response = await fetch('/api/projects');
+      const response = await fetch('/api/projects-supabase');
       if (!response.ok) throw new Error('Failed to fetch projects');
       projects = await response.json();
     } catch (err) {
