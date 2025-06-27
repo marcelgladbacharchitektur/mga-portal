@@ -1,0 +1,78 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install SSH client
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y openssh-client
+
+    - name: Deploy via SSH
+      env:
+        PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        HOST: ${{ secrets.HOST }}
+        USER: ${{ secrets.USERNAME }}
+      run: |
+        # Setup SSH with proper key format
+        mkdir -p ~/.ssh
+        echo "$PRIVATE_KEY" > ~/.ssh/deploy_key
+        chmod 600 ~/.ssh/deploy_key
+        
+        # Add host to known hosts
+        ssh-keyscan -H $HOST >> ~/.ssh/known_hosts 2>/dev/null
+        
+        # Test key format
+        echo "Testing SSH key..."
+        ssh-keygen -y -f ~/.ssh/deploy_key > ~/.ssh/deploy_key.pub || {
+          echo "Invalid SSH key format!"
+          echo "Make sure the SSH_PRIVATE_KEY secret contains the full private key including:"
+          echo "-----BEGIN OPENSSH PRIVATE KEY-----"
+          echo "...key content..."
+          echo "-----END OPENSSH PRIVATE KEY-----"
+          exit 1
+        }
+        
+        # Deploy using the key
+        ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no $USER@$HOST 'bash -s' << 'ENDSSH'
+          set -e
+          echo "Starting deployment..."
+          
+          # Navigate to app directory
+          cd /var/www/mga-portal || { echo "App directory not found!"; exit 1; }
+          
+          # Pull latest changes
+          echo "Pulling latest changes..."
+          git pull origin main
+          
+          # Install dependencies
+          echo "Installing dependencies..."
+          npm ci
+          
+          # Run database migrations
+          echo "Running database migrations..."
+          npx prisma migrate deploy
+          
+          # Build the application
+          echo "Building application..."
+          npm run build
+          
+          # Restart PM2 process
+          echo "Restarting application..."
+          pm2 restart mga-portal || pm2 start npm --name "mga-portal" -- start
+          
+          # Save PM2 process list
+          pm2 save
+          
+          echo "Deployment completed successfully!"
+        ENDSSH
