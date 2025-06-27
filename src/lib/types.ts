@@ -1,18 +1,3 @@
-import { createClient } from '@supabase/supabase-js';
-import { env } from '$env/dynamic/private';
-import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/public';
-
-export function getSupabaseClient() {
-  const supabaseUrl = PUBLIC_SUPABASE_URL || env.PUBLIC_SUPABASE_URL;
-  const supabaseKey = env.SUPABASE_SERVICE_KEY || PUBLIC_SUPABASE_ANON_KEY || env.PUBLIC_SUPABASE_ANON_KEY;
-  
-  if (!supabaseUrl || !supabaseKey) {
-    throw new Error('Supabase credentials not configured. URL: ' + supabaseUrl + ', Key: ' + (supabaseKey ? 'set' : 'missing'));
-  }
-  
-  return createClient(supabaseUrl, supabaseKey);
-}
-
 export type Project = {
   id?: string;
   project_id: string;
