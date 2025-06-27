@@ -83,16 +83,33 @@ npm run check      # Run svelte-check
 - **Border**: #E5E5E0 (Light Gray)
 - **Font**: Inter
 
-## Current UI Issues to Fix
-1. OmniCreate menu looks playful/cluttered
-2. Time entries cannot be deleted
-3. Redundant UI elements exist
-4. Overall design needs more professional consistency
+## Recent Updates
+1. ✅ Professional UI redesign completed
+2. ✅ Time entry deletion fixed
+3. ✅ Redundant UI elements removed
+4. ✅ Consistent design system implemented
+5. ✅ Google Tasks integration added
+6. ✅ Project search and list/grid view toggle
+7. ⚠️ Google OAuth needs proper setup in Google Cloud Console
 
 ## API Endpoints
 - `/api/projects-supabase` - Project CRUD
 - `/api/contacts` - Contact CRUD
 - `/api/time-entries` - Time entry CRUD
+- `/api/tasks` - Google Tasks integration
 - `/api/shortcuts` - Apple Shortcuts integration
-- `/api/auth/google/login` - OAuth login
-- `/api/auth/google/callback` - OAuth callback
+- `/api/auth/google?action=login` - OAuth login
+- `/auth/callback` - OAuth callback (page route)
+- `/api/projects/[id]/drive` - Google Drive browser
+
+## Google OAuth Setup
+1. Go to https://console.cloud.google.com
+2. Create new project or select existing
+3. Enable APIs: Drive API, Calendar API, Tasks API
+4. Create OAuth 2.0 Client ID
+5. Add redirect URI: `http://localhost:5173/auth/callback`
+6. Update .env with Client ID and Secret
+
+## Known Issues
+- Google OAuth must be configured in Google Cloud Console before Drive/Tasks features work
+- Server must be restarted after .env changes

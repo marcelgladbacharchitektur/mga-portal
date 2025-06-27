@@ -19,8 +19,7 @@
       label: 'Neue Aufgabe',
       icon: CheckSquare,
       color: 'bg-indigo-500',
-      href: 'https://tasks.google.com',
-      external: true
+      href: '/aufgaben?action=new'
     },
     {
       id: 'time',
