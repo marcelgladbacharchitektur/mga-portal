@@ -9,7 +9,8 @@
   const dispatch = createEventDispatcher();
   
   let formData = {
-    name: '',
+    first_name: '',
+    last_name: '',
     company: '',
     type: 'bauherr',
     email: '',
@@ -21,8 +22,19 @@
   let error = '';
   
   $: if (contact && open) {
+    // Parse existing name into first and last name if separate fields not available
+    let firstName = contact.first_name || '';
+    let lastName = contact.last_name || '';
+    
+    if (!firstName && !lastName && contact.name) {
+      const parts = contact.name.split(' ');
+      firstName = parts[0] || '';
+      lastName = parts.slice(1).join(' ') || '';
+    }
+    
     formData = {
-      name: contact.name,
+      first_name: firstName,
+      last_name: lastName,
       company: contact.company || '',
       type: contact.type || 'bauherr',
       email: contact.email || '',
@@ -41,7 +53,10 @@
       const response = await fetch(`/api/contacts/${contact.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify({
+          ...formData,
+          name: `${formData.first_name} ${formData.last_name}`.trim()
+        })
       });
       
       if (!response.ok) {
@@ -84,30 +99,43 @@
       
       <form on:submit|preventDefault={handleSubmit} class="space-y-4">
         <div class="grid grid-cols-2 gap-4">
-          <div class="col-span-2 sm:col-span-1">
-            <label for="edit-name" class="block text-sm font-medium text-ink mb-1">
-              Name *
+          <div>
+            <label for="edit-first-name" class="block text-sm font-medium text-ink mb-1">
+              Vorname *
             </label>
             <input
-              id="edit-name"
+              id="edit-first-name"
               type="text"
-              bind:value={formData.name}
+              bind:value={formData.first_name}
               required
               class="w-full px-3 py-2 border border-ink/20 rounded-md focus:outline-none focus:ring-2 focus:ring-accent-green/50 focus:border-accent-green"
             />
           </div>
           
-          <div class="col-span-2 sm:col-span-1">
-            <label for="edit-company" class="block text-sm font-medium text-ink mb-1">
-              Firma
+          <div>
+            <label for="edit-last-name" class="block text-sm font-medium text-ink mb-1">
+              Nachname *
             </label>
             <input
-              id="edit-company"
+              id="edit-last-name"
               type="text"
-              bind:value={formData.company}
+              bind:value={formData.last_name}
+              required
               class="w-full px-3 py-2 border border-ink/20 rounded-md focus:outline-none focus:ring-2 focus:ring-accent-green/50 focus:border-accent-green"
             />
           </div>
+        </div>
+        
+        <div>
+          <label for="edit-company" class="block text-sm font-medium text-ink mb-1">
+            Firma
+          </label>
+          <input
+            id="edit-company"
+            type="text"
+            bind:value={formData.company}
+            class="w-full px-3 py-2 border border-ink/20 rounded-md focus:outline-none focus:ring-2 focus:ring-accent-green/50 focus:border-accent-green"
+          />
         </div>
         
         <div>
@@ -175,7 +203,7 @@
           </button>
           <button
             type="submit"
-            disabled={loading || !formData.name}
+            disabled={loading || !formData.first_name || !formData.last_name}
             class="px-4 py-2 bg-accent-green text-white rounded-md hover:bg-accent-green/90 transition-colors disabled:bg-ink/30"
           >
             {loading ? 'Speichere...' : 'Speichern'}

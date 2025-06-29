@@ -42,7 +42,9 @@ export type Receipt = {
 
 export type Contact = {
   id?: string;
-  name: string;
+  name: string; // Full name for backward compatibility
+  first_name?: string;
+  last_name?: string;
   company?: string;
   type?: string;
   email?: string;

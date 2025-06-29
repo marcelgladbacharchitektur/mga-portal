@@ -15,6 +15,7 @@
     Download,
     Eye,
     CaretLeft,
+    CaretRight,
     House,
     MagnifyingGlass,
     List,
@@ -165,23 +166,49 @@
 <div class="container mx-auto p-4">
   <!-- Header -->
   <div class="mb-6">
-    <h1 class="text-2xl font-bold mb-4">Drive Browser</h1>
+    <div class="flex items-center gap-4 mb-4">
+      <a 
+        href="/projekte/{projectId}"
+        class="p-2 rounded-lg hover:bg-ink/5 transition-colors"
+        title="Zurück zum Projekt"
+      >
+        <CaretLeft size={24} class="text-ink/60" />
+      </a>
+      <h1 class="text-2xl font-bold">Drive Browser</h1>
+    </div>
     
     <!-- Breadcrumb -->
-    <div class="flex items-center gap-2 text-sm mb-4">
+    <div class="flex items-center gap-2 text-sm mb-4 p-3 bg-ink/5 rounded-lg">
+      {#if currentFolderId && currentFolderId !== 'root'}
+        <button
+          on:click={() => {
+            if (folderPath.length > 1) {
+              const parentFolder = folderPath[folderPath.length - 2];
+              navigateToFolder(parentFolder.id, folderPath.length - 2);
+            } else {
+              navigateToFolder('root');
+            }
+          }}
+          class="p-1 rounded hover:bg-ink/10 transition-colors"
+          title="Eine Ebene zurück"
+        >
+          <CaretLeft size={20} class="text-ink/60" />
+        </button>
+      {/if}
+      
       <button
         on:click={() => navigateToFolder('root')}
-        class="flex items-center gap-1 text-ink/60 hover:text-accent-green transition-colors"
+        class="flex items-center gap-1 text-ink/60 hover:text-accent-green transition-colors px-2 py-1 rounded hover:bg-ink/10"
       >
         <House size={16} />
-        <span>Root</span>
+        <span>Projekt-Ordner</span>
       </button>
       
       {#each folderPath as folder, i}
-        <span class="text-ink/40">/</span>
+        <CaretRight size={16} class="text-ink/40" />
         <button
           on:click={() => navigateToFolder(folder.id, i)}
-          class="text-ink/60 hover:text-accent-green transition-colors"
+          class="text-ink/60 hover:text-accent-green transition-colors px-2 py-1 rounded hover:bg-ink/10"
         >
           {folder.name}
         </button>

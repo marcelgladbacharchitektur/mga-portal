@@ -142,6 +142,7 @@
           {contact} 
           on:edit={(e) => handleEditContact(e.detail)}
           on:delete={handleContactDeleted}
+          on:view={(e) => handleEditContact(e.detail)}
         />
       {/each}
     </div>

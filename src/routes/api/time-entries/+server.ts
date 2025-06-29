@@ -5,6 +5,8 @@ import { getSupabaseClient } from '$lib/server/supabase';
 export const GET: RequestHandler = async ({ url }) => {
   try {
     const date = url.searchParams.get('date');
+    const start = url.searchParams.get('start');
+    const end = url.searchParams.get('end');
     const projectId = url.searchParams.get('project_id');
     const supabase = getSupabaseClient();
     
@@ -14,6 +16,7 @@ export const GET: RequestHandler = async ({ url }) => {
         *,
         project:projects(id, project_id, name)
       `)
+      .order('date', { ascending: false })
       .order('created_at', { ascending: false });
     
     if (date) {
@@ -25,6 +28,11 @@ export const GET: RequestHandler = async ({ url }) => {
       query = query
         .gte('date', startDate.toISOString())
         .lte('date', endDate.toISOString());
+    } else if (start && end) {
+      // Date range filtering
+      query = query
+        .gte('date', start)
+        .lte('date', end);
     }
     
     if (projectId) {
@@ -35,7 +43,13 @@ export const GET: RequestHandler = async ({ url }) => {
     
     if (error) throw error;
     
-    return json(entries || []);
+    // Transform to include project_name at top level
+    const transformedEntries = entries?.map(entry => ({
+      ...entry,
+      project_name: entry.project?.name || ''
+    })) || [];
+    
+    return json(transformedEntries);
   } catch (error) {
     console.error('Error fetching time entries:', error);
     return json({ error: 'Failed to fetch time entries' }, { status: 500 });

@@ -29,6 +29,8 @@ export const POST: RequestHandler = async ({ request }) => {
       .from('contacts')
       .insert([{
         name: data.name,
+        first_name: data.first_name || null,
+        last_name: data.last_name || null,
         company: data.company || null,
         type: data.type || null,
         email: data.email || null,

@@ -45,7 +45,10 @@
   }
 </script>
 
-<div class="card-hover p-6">
+<div 
+  class="card-hover p-6 cursor-pointer"
+  on:click={() => dispatch('view', contact)}
+>
   <div class="flex justify-between items-start mb-4">
     <div class="flex-1">
       <h3 class="text-lg font-semibold">{contact.name}</h3>
@@ -67,6 +70,7 @@
     {#if contact.email}
       <a 
         href="mailto:{contact.email}"
+        on:click|stopPropagation
         class="flex items-center gap-2 text-ink/70 hover:text-accent-green transition-colors"
       >
         <Envelope size={16} class="flex-shrink-0" />
@@ -77,6 +81,7 @@
     {#if contact.phone}
       <a 
         href="tel:{contact.phone}"
+        on:click|stopPropagation
         class="flex items-center gap-2 text-ink/70 hover:text-accent-green transition-colors"
       >
         <Phone size={16} class="flex-shrink-0" />
@@ -94,14 +99,14 @@
   
   <div class="flex justify-end gap-2 mt-4 pt-4 border-t border-ink/5">
     <button
-      on:click={() => dispatch('edit', contact)}
+      on:click|stopPropagation={() => dispatch('edit', contact)}
       class="p-2 rounded-lg hover:bg-ink/5 transition-colors"
       title="Bearbeiten"
     >
       <PencilSimple size={18} class="text-ink/60" />
     </button>
     <button
-      on:click={handleDelete}
+      on:click|stopPropagation={handleDelete}
       class="p-2 rounded-lg hover:bg-red-50 transition-colors"
       title="Löschen"
     >

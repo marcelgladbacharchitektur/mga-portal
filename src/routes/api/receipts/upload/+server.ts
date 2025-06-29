@@ -53,8 +53,12 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
     });
     
     return json(response.data);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error uploading receipt:', error);
-    return json({ error: 'Failed to upload receipt' }, { status: 500 });
+    return json({ 
+      error: 'Failed to upload receipt',
+      details: error.message || 'Unknown error',
+      code: error.code
+    }, { status: 500 });
   }
 };

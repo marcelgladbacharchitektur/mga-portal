@@ -43,14 +43,21 @@ export type TimeEntry = {
 
 export type Receipt = {
   id?: string;
-  project_id: string;
-  invoice_date: string;
+  project_id?: string;
+  invoice_date?: string;
   payment_date?: string;
   vendor: string;
   invoice_number?: string;
   amount: number;
+  currency?: string;
+  tax_amount?: number;
+  payment_method?: string;
+  category?: string;
+  drive_file_id?: string;
   filename?: string;
   file_url?: string;
+  analysis_confidence?: number;
+  items?: string;
   created_at?: string;
   updated_at?: string;
 };

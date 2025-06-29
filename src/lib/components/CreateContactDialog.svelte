@@ -7,7 +7,8 @@
   const dispatch = createEventDispatcher();
   
   let formData = {
-    name: '',
+    first_name: '',
+    last_name: '',
     company: '',
     type: 'bauherr',
     email: '',
@@ -26,7 +27,10 @@
       const response = await fetch('/api/contacts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify({
+          ...formData,
+          name: `${formData.first_name} ${formData.last_name}`.trim()
+        })
       });
       
       if (!response.ok) {
@@ -38,7 +42,8 @@
       
       // Reset form
       formData = {
-        name: '',
+        first_name: '',
+        last_name: '',
         company: '',
         type: 'bauherr',
         email: '',
@@ -79,32 +84,46 @@
       
       <form on:submit|preventDefault={handleSubmit} class="space-y-4">
         <div class="grid grid-cols-2 gap-4">
-          <div class="col-span-2 sm:col-span-1">
-            <label for="name" class="block text-sm font-medium text-ink mb-1">
-              Name *
+          <div>
+            <label for="first_name" class="block text-sm font-medium text-ink mb-1">
+              Vorname *
             </label>
             <input
-              id="name"
+              id="first_name"
               type="text"
-              bind:value={formData.name}
+              bind:value={formData.first_name}
               required
               class="w-full px-3 py-2 border border-ink/20 rounded-md focus:outline-none focus:ring-2 focus:ring-accent-green/50 focus:border-accent-green"
-              placeholder="Max Mustermann"
+              placeholder="Max"
             />
           </div>
           
-          <div class="col-span-2 sm:col-span-1">
-            <label for="company" class="block text-sm font-medium text-ink mb-1">
-              Firma
+          <div>
+            <label for="last_name" class="block text-sm font-medium text-ink mb-1">
+              Nachname *
             </label>
             <input
-              id="company"
+              id="last_name"
               type="text"
-              bind:value={formData.company}
+              bind:value={formData.last_name}
+              required
               class="w-full px-3 py-2 border border-ink/20 rounded-md focus:outline-none focus:ring-2 focus:ring-accent-green/50 focus:border-accent-green"
-              placeholder="Musterfirma GmbH"
+              placeholder="Mustermann"
             />
           </div>
+        </div>
+        
+        <div>
+          <label for="company" class="block text-sm font-medium text-ink mb-1">
+            Firma
+          </label>
+          <input
+            id="company"
+            type="text"
+            bind:value={formData.company}
+            class="w-full px-3 py-2 border border-ink/20 rounded-md focus:outline-none focus:ring-2 focus:ring-accent-green/50 focus:border-accent-green"
+            placeholder="Musterfirma GmbH"
+          />
         </div>
         
         <div>
@@ -175,7 +194,7 @@
           </button>
           <button
             type="submit"
-            disabled={loading || !formData.name}
+            disabled={loading || !formData.first_name || !formData.last_name}
             class="px-4 py-2 bg-accent-green text-white rounded-md hover:bg-accent-green/90 transition-colors disabled:bg-ink/30"
           >
             {loading ? 'Erstelle...' : 'Kontakt erstellen'}

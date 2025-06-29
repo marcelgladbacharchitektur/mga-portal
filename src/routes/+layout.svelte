@@ -13,6 +13,7 @@
     { href: '/projekte', label: 'Projekte', icon: FolderOpen },
     { href: '/zeiterfassung', label: 'Zeit', icon: Clock },
     { href: '/aufgaben', label: 'Aufgaben', icon: CheckSquare },
+    { href: '/belege', label: 'Belege', icon: Receipt },
     { href: '/kontakte', label: 'Kontakte', icon: Users },
   ];
 </script>

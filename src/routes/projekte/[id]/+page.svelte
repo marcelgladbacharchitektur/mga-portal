@@ -3,6 +3,7 @@
   import { onMount } from 'svelte';
   import type { Project } from '$lib/types';
   import ProjectContacts from '$lib/components/ProjectContacts.svelte';
+  import ProjectTimeOverview from '$lib/components/ProjectTimeOverview.svelte';
   import { GoogleDriveLogo, Calendar, ListChecks, Clock, Folder, ArrowLeft } from 'phosphor-svelte';
   
   let project: Project | null = null;
@@ -150,6 +151,9 @@
       
       <!-- Project Contacts -->
       <ProjectContacts projectId={project.id} />
+      
+      <!-- Time Overview -->
+      <ProjectTimeOverview projectId={project.id} />
     </div>
   {/if}
 </div>

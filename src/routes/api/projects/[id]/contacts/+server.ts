@@ -24,7 +24,10 @@ export const GET: RequestHandler = async ({ params }) => {
       `)
       .eq('project_id', id);
     
-    if (error) throw error;
+    if (error) {
+      console.error('Supabase error:', error);
+      throw error;
+    }
     
     // Flatten the data structure
     const contacts = data?.map(item => ({
@@ -33,9 +36,18 @@ export const GET: RequestHandler = async ({ params }) => {
     })) || [];
     
     return json(contacts);
-  } catch (error) {
-    console.error('Error fetching project contacts:', error);
-    return json({ error: 'Failed to fetch project contacts' }, { status: 500 });
+  } catch (error: any) {
+    console.error('Error fetching project contacts:', {
+      message: error.message,
+      hint: error.hint,
+      details: error.details,
+      code: error.code
+    });
+    return json({ 
+      error: 'Failed to fetch project contacts',
+      details: error.message,
+      hint: error.hint
+    }, { status: 500 });
   }
 };
 

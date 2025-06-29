@@ -28,15 +28,15 @@
   }
 </script>
 
-<div class="card-hover p-6">
+<a href="/projekte/{project.id}" class="block card-hover p-6 group">
   <div class="flex justify-between items-start mb-4">
     <div>
       <h3 class="text-lg font-semibold">{project.name}</h3>
       <span class="text-sm font-mono text-ink/60">{project.project_id}</span>
     </div>
     <button
-      on:click={() => dispatch('edit', project)}
-      class="p-2 rounded-lg hover:bg-ink/5 transition-colors"
+      on:click|preventDefault|stopPropagation={() => dispatch('edit', project)}
+      class="p-2 rounded-lg hover:bg-ink/5 transition-colors relative z-10"
       title="Projekt bearbeiten"
     >
       <PencilSimple size={20} class="text-ink/60" />
@@ -68,29 +68,22 @@
   
   <!-- Quick Links -->
   <div class="mt-3 mb-3 flex flex-wrap gap-2">
-    <a
-      href="/projekte/{project.id}"
-      class="inline-flex items-center gap-1 px-2 py-1 text-xs bg-ink/5 hover:bg-ink/10 rounded-full transition-colors"
-    >
-      <Users size={14} />
-      Details & Kontakte
-    </a>
     {#if project.drive_folder_url}
-      <a
-        href="/projekte/{project.id}/drive"
-        class="inline-flex items-center gap-1 px-2 py-1 text-xs bg-ink/5 hover:bg-ink/10 rounded-full transition-colors"
+      <span
+        on:click|preventDefault|stopPropagation={() => window.location.href = `/projekte/${project.id}/drive`}
+        class="inline-flex items-center gap-1 px-2 py-1 text-xs bg-ink/5 hover:bg-ink/10 rounded-full transition-colors cursor-pointer relative z-10"
       >
         <Folder size={14} />
         Drive Browser
-      </a>
+      </span>
     {/if}
-    <a
-      href="/zeiterfassung?project={project.id}"
-      class="inline-flex items-center gap-1 px-2 py-1 text-xs bg-ink/5 hover:bg-ink/10 rounded-full transition-colors"
+    <span
+      on:click|preventDefault|stopPropagation={() => window.location.href = `/zeiterfassung?project=${project.id}`}
+      class="inline-flex items-center gap-1 px-2 py-1 text-xs bg-ink/5 hover:bg-ink/10 rounded-full transition-colors cursor-pointer relative z-10"
     >
       <Clock size={14} />
       Zeit erfassen
-    </a>
+    </span>
   </div>
   
   <div class="flex items-center justify-between">
@@ -100,16 +93,14 @@
     
     <div class="flex space-x-2">
       {#if project.drive_folder_url}
-        <a
-          href={project.drive_folder_url}
-          target="_blank"
-          rel="noopener noreferrer"
-          class="text-ink/60 hover:text-accent-green transition-colors"
+        <button
+          on:click|preventDefault|stopPropagation={() => window.open(project.drive_folder_url, '_blank')}
+          class="text-ink/60 hover:text-accent-green transition-colors relative z-10"
           title="Google Drive Ordner"
           aria-label="Google Drive Ordner öffnen"
         >
           <GoogleDriveLogo size={20} weight="fill" />
-        </a>
+        </button>
       {/if}
       
       {#if project.calendar_id}
@@ -133,4 +124,4 @@
       {/if}
     </div>
   </div>
-</div>
+</a>

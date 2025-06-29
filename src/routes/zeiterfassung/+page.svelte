@@ -1,8 +1,9 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import type { TimeEntry, Project } from '$lib/types';
-  import { Clock, Plus, Calendar, Timer, Pause, Play, Check, Trash } from 'phosphor-svelte';
+  import { Clock, Plus, Calendar, Timer, Pause, Play, Check, Trash, ChartBar, Download } from 'phosphor-svelte';
   import { page } from '$app/stores';
+  import TimeExportPDF from '$lib/components/TimeExportPDFSimple.svelte';
   
   interface TimeEntryWithProject extends TimeEntry {
     project?: Project;
@@ -19,6 +20,15 @@
   
   // New entry form
   let showAddDialog = false;
+  let showExportDialog = false;
+  let showPDFGenerator = false;
+  let pdfExportParams: { start: string; end: string; projectId: string | null } | null = null;
+  let exportOptions = {
+    type: 'day', // day, month, year, project
+    projectId: '',
+    startDate: selectedDate,
+    endDate: selectedDate
+  };
   let newEntry = {
     project_id: '',
     date: new Date().toISOString().split('T')[0],
@@ -59,7 +69,10 @@
     if (!activeTimer || !timerInterval) return;
     
     clearInterval(timerInterval);
-    const duration = Math.floor((new Date().getTime() - activeTimer.startTime.getTime()) / 1000 / 60);
+    const elapsedMinutes = Math.floor((new Date().getTime() - activeTimer.startTime.getTime()) / 1000 / 60);
+    
+    // Round up to next 15-minute increment
+    const duration = Math.ceil(elapsedMinutes / 15) * 15;
     
     // Create time entry
     createTimeEntry({
@@ -150,9 +163,19 @@
   }
   
   function formatDuration(minutes: number) {
-    const hours = Math.floor(minutes / 60);
+    const hours = minutes / 60;
+    // Round to nearest 0.25
+    const roundedHours = Math.round(hours * 4) / 4;
+    
+    // Format as decimal hours if it's a clean quarter hour
+    if (minutes % 15 === 0) {
+      return `${roundedHours.toFixed(2)}h`;
+    }
+    
+    // Otherwise show traditional format
+    const wholeHours = Math.floor(minutes / 60);
     const mins = minutes % 60;
-    return `${hours}:${mins.toString().padStart(2, '0')}`;
+    return `${wholeHours}:${mins.toString().padStart(2, '0')}`;
   }
   
   function getTotalHours() {
@@ -163,6 +186,41 @@
     return timeEntries
       .filter(entry => entry.billable)
       .reduce((sum, entry) => sum + (entry.duration_minutes || 0), 0);
+  }
+  
+  function handleExport() {
+    let start = '';
+    let end = '';
+    
+    switch (exportOptions.type) {
+      case 'day':
+        start = exportOptions.startDate;
+        end = exportOptions.startDate;
+        break;
+      case 'month':
+        const date = new Date(exportOptions.startDate);
+        start = new Date(date.getFullYear(), date.getMonth(), 1).toISOString().split('T')[0];
+        end = new Date(date.getFullYear(), date.getMonth() + 1, 0).toISOString().split('T')[0];
+        break;
+      case 'year':
+        const yearDate = new Date(exportOptions.startDate);
+        start = `${yearDate.getFullYear()}-01-01`;
+        end = `${yearDate.getFullYear()}-12-31`;
+        break;
+      case 'custom':
+        start = exportOptions.startDate;
+        end = exportOptions.endDate;
+        break;
+    }
+    
+    // Use client-side PDF generation
+    pdfExportParams = {
+      start,
+      end,
+      projectId: exportOptions.projectId || null
+    };
+    showPDFGenerator = true;
+    showExportDialog = false;
   }
   
   onMount(async () => {
@@ -187,12 +245,39 @@
   <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-6 gap-4">
     <h1 class="text-3xl font-bold">Zeiterfassung</h1>
     
-    <div>
+    <div class="flex items-center gap-3">
+      <a 
+        href="/zeiterfassung/ubersicht"
+        class="flex items-center gap-2 px-4 py-2 bg-white border border-ink/20 rounded-lg hover:bg-ink/5 transition-colors"
+      >
+        <ChartBar size={20} />
+        <span>Übersicht</span>
+      </a>
+      
+      <button
+        on:click={() => {
+          exportOptions.startDate = selectedDate;
+          exportOptions.endDate = selectedDate;
+          showExportDialog = true;
+        }}
+        class="flex items-center gap-2 px-4 py-2 bg-white border border-ink/20 rounded-lg hover:bg-ink/5 transition-colors"
+      >
+        <Download size={20} />
+        <span>Export</span>
+      </button>
+      
       <input
         type="date"
         bind:value={selectedDate}
         class="px-4 py-2 border border-ink/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-green/50"
       />
+      
+      <button
+        on:click={() => showAddDialog = true}
+        class="p-2 bg-accent-green text-white rounded-lg hover:bg-accent-green/90 transition-colors"
+      >
+        <Plus size={20} />
+      </button>
     </div>
   </div>
   
@@ -381,14 +466,15 @@
               />
             </div>
             <div>
-              <input
-                type="number"
+              <select
                 bind:value={newEntry.minutes}
-                min="0"
-                max="59"
-                placeholder="Minuten"
                 class="w-full px-3 py-2 border border-ink/20 rounded-md focus:outline-none focus:ring-2 focus:ring-accent-green/50"
-              />
+              >
+                <option value={0}>00 Min</option>
+                <option value={15}>15 Min</option>
+                <option value={30}>30 Min</option>
+                <option value={45}>45 Min</option>
+              </select>
             </div>
           </div>
         </div>
@@ -436,5 +522,131 @@
       </form>
     </div>
   </div>
+{/if}
+
+<!-- Export Dialog -->
+{#if showExportDialog}
+  <div class="fixed inset-0 bg-ink/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-lg max-w-md w-full p-6 shadow-xl border border-ink/5">
+      <h2 class="text-xl font-bold mb-4">Stundenaufstellung exportieren</h2>
+      
+      <form on:submit|preventDefault={handleExport} class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-ink mb-1">
+            Zeitraum
+          </label>
+          <select
+            bind:value={exportOptions.type}
+            class="w-full px-3 py-2 border border-ink/20 rounded-md focus:outline-none focus:ring-2 focus:ring-accent-green/50"
+          >
+            <option value="day">Tag</option>
+            <option value="month">Monat</option>
+            <option value="year">Jahr</option>
+            <option value="custom">Benutzerdefiniert</option>
+          </select>
+        </div>
+        
+        {#if exportOptions.type === 'day' || exportOptions.type === 'month'}
+          <div>
+            <label class="block text-sm font-medium text-ink mb-1">
+              {exportOptions.type === 'day' ? 'Tag' : 'Monat'}
+            </label>
+            <input
+              type="date"
+              bind:value={exportOptions.startDate}
+              class="w-full px-3 py-2 border border-ink/20 rounded-md focus:outline-none focus:ring-2 focus:ring-accent-green/50"
+            />
+          </div>
+        {/if}
+        
+        {#if exportOptions.type === 'year'}
+          <div>
+            <label class="block text-sm font-medium text-ink mb-1">
+              Jahr
+            </label>
+            <select
+              bind:value={exportOptions.startDate}
+              class="w-full px-3 py-2 border border-ink/20 rounded-md focus:outline-none focus:ring-2 focus:ring-accent-green/50"
+            >
+              {#each Array.from({length: 11}, (_, i) => new Date().getFullYear() - 5 + i) as year}
+                <option value={`${year}-01-01`}>{year}</option>
+              {/each}
+            </select>
+          </div>
+        {/if}
+        
+        {#if exportOptions.type === 'custom'}
+          <div>
+            <label class="block text-sm font-medium text-ink mb-1">
+              Von
+            </label>
+            <input
+              type="date"
+              bind:value={exportOptions.startDate}
+              class="w-full px-3 py-2 border border-ink/20 rounded-md focus:outline-none focus:ring-2 focus:ring-accent-green/50"
+            />
+          </div>
+          
+          <div>
+            <label class="block text-sm font-medium text-ink mb-1">
+              Bis
+            </label>
+            <input
+              type="date"
+              bind:value={exportOptions.endDate}
+              class="w-full px-3 py-2 border border-ink/20 rounded-md focus:outline-none focus:ring-2 focus:ring-accent-green/50"
+            />
+          </div>
+        {/if}
+        
+        <div>
+          <label class="block text-sm font-medium text-ink mb-1">
+            Projekt (optional)
+          </label>
+          <select
+            bind:value={exportOptions.projectId}
+            class="w-full px-3 py-2 border border-ink/20 rounded-md focus:outline-none focus:ring-2 focus:ring-accent-green/50"
+          >
+            <option value="">Alle Projekte</option>
+            {#each projects as project}
+              <option value={project.id}>
+                {project.project_id} - {project.name}
+              </option>
+            {/each}
+          </select>
+        </div>
+        
+        <div class="flex justify-end gap-3 pt-4">
+          <button
+            type="button"
+            on:click={() => showExportDialog = false}
+            class="px-4 py-2 text-ink bg-ink/10 rounded-md hover:bg-ink/20 transition-colors"
+          >
+            Abbrechen
+          </button>
+          <button
+            type="submit"
+            class="px-4 py-2 bg-accent-green text-white rounded-md hover:bg-accent-green/90 transition-colors flex items-center gap-2"
+          >
+            <Download size={16} />
+            PDF exportieren
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+{/if}
+
+<!-- PDF Generator -->
+{#if showPDFGenerator && pdfExportParams}
+  <TimeExportPDF
+    start={pdfExportParams.start}
+    end={pdfExportParams.end}
+    projectId={pdfExportParams.projectId}
+    onClose={() => {
+      showPDFGenerator = false;
+      pdfExportParams = null;
+    }}
+  />
 {/if}
 
