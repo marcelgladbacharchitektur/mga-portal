@@ -1,5 +1,5 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { GEMINI_API_KEY } from '$env/static/private';
+import { env } from '$env/dynamic/private';
 
 export interface ReceiptAnalysis {
   vendor: string;
@@ -22,11 +22,19 @@ export interface ReceiptAnalysis {
 }
 
 export async function analyzeReceipt(imageBuffer: ArrayBuffer, mimeType: string): Promise<ReceiptAnalysis> {
-  if (!GEMINI_API_KEY) {
-    throw new Error('Gemini API key not configured');
+  console.log('analyzeReceipt called with:', {
+    bufferSize: imageBuffer.byteLength,
+    mimeType,
+    hasApiKey: !!env.GEMINI_API_KEY,
+    apiKeyLength: env.GEMINI_API_KEY?.length
+  });
+  
+  if (!env.GEMINI_API_KEY) {
+    console.error('GEMINI_API_KEY is not configured');
+    throw new Error('Gemini API key not configured - please set GEMINI_API_KEY environment variable');
   }
 
-  const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+  const genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY);
   const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
   const prompt = `Analysiere diesen Beleg/diese Rechnung und extrahiere folgende Informationen im JSON-Format:
@@ -46,23 +54,39 @@ export async function analyzeReceipt(imageBuffer: ArrayBuffer, mimeType: string)
   Antworte NUR mit validem JSON, keine zusätzlichen Erklärungen.`;
 
   try {
+    console.log('Converting image to base64...');
     const image = {
       inlineData: {
         data: Buffer.from(imageBuffer).toString('base64'),
         mimeType
       }
     };
+    console.log('Base64 conversion complete, size:', image.inlineData.data.length);
 
+    console.log('Calling Gemini API...');
     const result = await model.generateContent([prompt, image]);
     const response = await result.response;
     const text = response.text();
+    console.log('Gemini response received, length:', text.length);
     
     // Extract JSON from response
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    console.log('Raw Gemini response:', text.substring(0, 500) + '...');
+    
+    // Try to extract JSON from markdown code blocks first
+    let jsonStr = text;
+    const codeBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (codeBlockMatch) {
+      jsonStr = codeBlockMatch[1].trim();
+    }
+    
+    // Then try to extract JSON object
+    const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
+      console.error('No JSON found in response:', text);
       throw new Error('No valid JSON found in response');
     }
 
+    console.log('Extracted JSON:', jsonMatch[0]);
     const analysis = JSON.parse(jsonMatch[0]) as ReceiptAnalysis;
     
     // Validate and clean data
@@ -73,10 +97,25 @@ export async function analyzeReceipt(imageBuffer: ArrayBuffer, mimeType: string)
         analysis.invoiceDate = date.toISOString().split('T')[0];
       }
     }
+    
+    // Log the final analysis result
+    console.log('Final analysis result:', {
+      vendor: analysis.vendor,
+      amount: analysis.amount,
+      totalAmount: analysis.totalAmount,
+      invoiceDate: analysis.invoiceDate,
+      invoiceNumber: analysis.invoiceNumber,
+      category: analysis.category
+    });
 
     return analysis;
-  } catch (error) {
-    console.error('Gemini analysis error:', error);
-    throw new Error('Failed to analyze receipt');
+  } catch (error: any) {
+    console.error('Gemini analysis error:', {
+      error: error.message,
+      stack: error.stack,
+      apiKeyPresent: !!env.GEMINI_API_KEY,
+      apiKeyLength: env.GEMINI_API_KEY?.length
+    });
+    throw new Error(`Failed to analyze receipt: ${error.message}`);
   }
 }

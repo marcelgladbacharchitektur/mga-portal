@@ -1,7 +1,7 @@
 <script lang="ts">
   import '../app.css';
   import { page } from '$app/stores';
-  import { House, FolderOpen, Clock, Receipt, Users, Plus, CheckSquare, DotsThree, CurrencyCircleDollar } from 'phosphor-svelte';
+  import { House, FolderOpen, Clock, Receipt, Users, Plus, CheckSquare, DotsThree, CurrencyCircleDollar, Gear } from 'phosphor-svelte';
   import OmniCreate from '$lib/components/OmniCreate.svelte';
   
   let omniCreateOpen = false;
@@ -16,6 +16,7 @@
     { href: '/finanzen', label: 'Finanzen', icon: CurrencyCircleDollar },
     { href: '/aufgaben', label: 'Aufgaben', icon: CheckSquare },
     { href: '/kontakte', label: 'Kontakte', icon: Users },
+    { href: '/einstellungen', label: 'Einstellungen', icon: Gear },
   ];
   
   // Primary items for mobile (most used)

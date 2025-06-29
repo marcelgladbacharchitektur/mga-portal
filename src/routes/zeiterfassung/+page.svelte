@@ -362,10 +362,17 @@
       <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-accent-green"></div>
     </div>
   {:else if timeEntries.length === 0}
-    <div class="text-center py-12">
-      <Clock size={48} class="mx-auto text-ink/30 mb-4" />
-      <p class="text-ink/60">Keine Zeiteinträge für diesen Tag</p>
-      <p class="text-sm text-ink/40 mt-2">Nutzen Sie den + Button oder die Schnell-Timer</p>
+    <div class="bg-ink/5 rounded-lg p-8 text-center">
+      <Timer size={48} class="mx-auto text-ink/30 mb-4" />
+      <h3 class="text-lg font-medium text-ink mb-2">Keine Zeiteinträge für diesen Tag</h3>
+      <p class="text-ink/60 mb-4">Erfassen Sie Ihre Arbeitszeit mit dem Timer oder manuell.</p>
+      <button
+        on:click={() => showAddDialog = true}
+        class="inline-flex items-center gap-2 px-4 py-2 bg-accent-green text-white rounded-lg hover:bg-accent-green/90 transition-colors"
+      >
+        <Plus size={20} />
+        Zeit erfassen
+      </button>
     </div>
   {:else}
     <div class="bg-white rounded-lg shadow-sm border border-ink/10 overflow-hidden">

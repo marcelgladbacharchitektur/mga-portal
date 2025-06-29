@@ -4,11 +4,14 @@
   import type { Project } from '$lib/types';
   import ProjectContacts from '$lib/components/ProjectContacts.svelte';
   import ProjectTimeOverview from '$lib/components/ProjectTimeOverview.svelte';
-  import { GoogleDriveLogo, Calendar, ListChecks, Clock, Folder, ArrowLeft } from 'phosphor-svelte';
+  import { GoogleDriveLogo, Calendar, ListChecks, Clock, Folder, ArrowLeft, Pencil, Check, X } from 'phosphor-svelte';
   
   let project: Project | null = null;
   let loading = true;
   let error = '';
+  let editingDriveFolder = false;
+  let driveFolderId = '';
+  let savingDriveFolder = false;
   
   $: projectId = $page.params.id;
   
@@ -20,6 +23,7 @@
       const response = await fetch(`/api/projects-supabase/${projectId}`);
       if (!response.ok) throw new Error('Failed to load project');
       project = await response.json();
+      driveFolderId = project.drive_folder_id || '';
     } catch (err) {
       error = err instanceof Error ? err.message : 'Unknown error';
     } finally {
@@ -45,6 +49,38 @@
       case 'ARCHIVED': return 'Archiviert';
       default: return status;
     }
+  }
+  
+  async function saveDriveFolder() {
+    if (!project) return;
+    
+    savingDriveFolder = true;
+    try {
+      const response = await fetch(`/api/projects-supabase/${project.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ drive_folder_id: driveFolderId })
+      });
+      
+      if (!response.ok) throw new Error('Failed to update drive folder');
+      
+      project.drive_folder_id = driveFolderId;
+      editingDriveFolder = false;
+    } catch (err) {
+      error = err instanceof Error ? err.message : 'Unknown error';
+    } finally {
+      savingDriveFolder = false;
+    }
+  }
+  
+  function startEditingDriveFolder() {
+    driveFolderId = project?.drive_folder_id || '';
+    editingDriveFolder = true;
+  }
+  
+  function cancelEditingDriveFolder() {
+    driveFolderId = project?.drive_folder_id || '';
+    editingDriveFolder = false;
   }
   
   onMount(() => {
@@ -110,9 +146,70 @@
         </div>
       </div>
       
+      <!-- Drive Folder Configuration -->
+      <div class="bg-white rounded-lg shadow-sm border border-ink/10 p-6 mb-8">
+        <div class="flex items-start justify-between">
+          <div class="flex-1">
+            <h3 class="text-lg font-semibold mb-2 flex items-center gap-2">
+              <Folder size={20} />
+              Google Drive Ordner
+            </h3>
+            {#if !editingDriveFolder}
+              <p class="text-sm text-ink/60 mb-2">
+                {#if project.drive_folder_id}
+                  Ordner-ID: <span class="font-mono">{project.drive_folder_id}</span>
+                {:else}
+                  Kein Drive-Ordner konfiguriert
+                {/if}
+              </p>
+            {:else}
+              <div class="flex items-center gap-2">
+                <input
+                  type="text"
+                  bind:value={driveFolderId}
+                  placeholder="Drive Ordner-ID eingeben"
+                  class="flex-1 px-3 py-2 border border-ink/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-green/50"
+                />
+                <button
+                  on:click={saveDriveFolder}
+                  disabled={savingDriveFolder}
+                  class="p-2 bg-accent-green text-white rounded-lg hover:bg-accent-green/90 disabled:bg-ink/30"
+                  title="Speichern"
+                >
+                  {#if savingDriveFolder}
+                    <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                  {:else}
+                    <Check size={20} />
+                  {/if}
+                </button>
+                <button
+                  on:click={cancelEditingDriveFolder}
+                  class="p-2 bg-ink/10 text-ink rounded-lg hover:bg-ink/20"
+                  title="Abbrechen"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+              <p class="text-xs text-ink/60 mt-2">
+                Sie finden die ID in der Drive-URL nach "folders/"
+              </p>
+            {/if}
+          </div>
+          {#if !editingDriveFolder}
+            <button
+              on:click={startEditingDriveFolder}
+              class="p-2 text-ink/60 hover:bg-ink/5 rounded-lg transition-colors"
+              title="Bearbeiten"
+            >
+              <Pencil size={20} />
+            </button>
+          {/if}
+        </div>
+      </div>
+      
       <!-- Quick Actions -->
       <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        {#if project.drive_folder_url}
+        {#if project.drive_folder_id}
           <a
             href="/projekte/{project.id}/drive"
             class="flex items-center justify-center gap-3 p-4 bg-white rounded-lg shadow-sm border border-ink/10 hover:shadow-md transition-shadow"

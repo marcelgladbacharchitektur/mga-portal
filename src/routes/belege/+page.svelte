@@ -1,8 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { Receipt, Upload, Camera, MagnifyingGlass, Download, Eye, Trash, FolderOpen, X, Sparkle, Calendar, Folder, CaretRight, ArrowRight } from 'phosphor-svelte';
+  import { Receipt, Upload, Camera, MagnifyingGlass, Download, Eye, Trash, FolderOpen, X, Sparkle, Calendar, Folder, CaretRight, Pencil, ArrowsClockwise, Check } from 'phosphor-svelte';
   import type { Receipt as ReceiptType } from '$lib/server/supabase';
-  import { DRIVE_FOLDERS } from '$lib/config/drive-folders';
   
   let receipts: ReceiptType[] = [];
   let driveFiles: any[] = [];
@@ -20,9 +19,17 @@
   let previewReceipt: ReceiptType | null = null;
   let activeTab: 'table' | 'drive' = 'table';
   let isAuthenticated = false;
-  let showMoveDialog = false;
-  let fileToMove: any = null;
-  let selectedTargetFolder = '';
+  let settingsFolderId = '';
+  let editingReceipt: ReceiptType | null = null;
+  let editForm = {
+    vendor: '',
+    invoice_number: '',
+    invoice_date: '',
+    amount: 0,
+    currency: 'EUR',
+    category: '',
+    payment_date: ''
+  };
   
   async function checkAuth() {
     try {
@@ -33,6 +40,18 @@
       }
     } catch (err) {
       console.error('Auth check failed:', err);
+    }
+  }
+  
+  async function loadSettings() {
+    try {
+      const response = await fetch('/api/settings');
+      if (response.ok) {
+        const settings = await response.json();
+        settingsFolderId = settings.drive_folders.receipts;
+      }
+    } catch (err) {
+      console.error('Failed to load settings:', err);
     }
   }
   
@@ -54,13 +73,13 @@
   
   async function loadDriveFiles(folderId?: string) {
     try {
-      // Use provided folder ID or default to receipts inbox
-      const targetFolderId = folderId || DRIVE_FOLDERS.RECEIPTS_INBOX;
+      // Use provided folder ID or default to settings folder
+      const targetFolderId = folderId || settingsFolderId;
       
       if (!folderId) {
-        receiptsFolderId = DRIVE_FOLDERS.RECEIPTS_INBOX;
-        currentFolderId = DRIVE_FOLDERS.RECEIPTS_INBOX;
-        folderPath = [{ id: DRIVE_FOLDERS.RECEIPTS_INBOX, name: 'Belege' }];
+        receiptsFolderId = settingsFolderId;
+        currentFolderId = settingsFolderId;
+        folderPath = [{ id: settingsFolderId, name: 'Belege' }];
       }
       
       // Load both files and folders
@@ -96,38 +115,6 @@
     await loadDriveFiles(folder.id);
   }
   
-  async function moveFile() {
-    if (!fileToMove || !selectedTargetFolder) return;
-    
-    try {
-      const response = await fetch('/api/receipts/move', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fileId: fileToMove.id,
-          targetFolderId: selectedTargetFolder,
-          currentFolderId: currentFolderId
-        })
-      });
-      
-      if (!response.ok) throw new Error('Failed to move file');
-      
-      // Save filename before clearing
-      const fileName = fileToMove.name;
-      
-      // Close dialog
-      showMoveDialog = false;
-      fileToMove = null;
-      selectedTargetFolder = '';
-      
-      // Refresh current folder
-      await loadDriveFiles(currentFolderId);
-      
-      alert(`Datei "${fileName}" wurde erfolgreich verschoben!`);
-    } catch (err) {
-      alert('Fehler beim Verschieben: ' + (err instanceof Error ? err.message : 'Unknown error'));
-    }
-  }
   
   async function analyzeReceipt(fileId: string, filename: string) {
     analyzing = true;
@@ -138,13 +125,18 @@
         body: JSON.stringify({ fileId })
       });
       
-      if (!response.ok) throw new Error('Failed to analyze receipt');
+      if (!response.ok) {
+        const error = await response.json();
+        console.error('Analysis error:', error);
+        throw new Error(error.details || error.error || 'Failed to analyze receipt');
+      }
       
       const result = await response.json();
       await loadReceipts(); // Reload to show new receipt
       
       alert(`Beleg "${filename}" wurde erfolgreich analysiert!`);
     } catch (err) {
+      console.error('Receipt analysis error:', err);
       alert('Fehler bei der Analyse: ' + (err instanceof Error ? err.message : 'Unknown error'));
     } finally {
       analyzing = false;
@@ -162,8 +154,8 @@
     try {
       const formData = new FormData();
       formData.append('file', selectedFile);
-      // Always upload to inbox folder, not current folder
-      formData.append('folderId', DRIVE_FOLDERS.RECEIPTS_INBOX);
+      // Upload to settings folder
+      formData.append('folderId', settingsFolderId);
       
       const response = await fetch('/api/receipts/upload', {
         method: 'POST',
@@ -213,6 +205,68 @@
     }
   }
   
+  function startEditingReceipt(receipt: ReceiptType) {
+    editingReceipt = receipt;
+    editForm = {
+      vendor: receipt.vendor || '',
+      invoice_number: receipt.invoice_number || '',
+      invoice_date: receipt.invoice_date || '',
+      amount: receipt.amount || 0,
+      currency: receipt.currency || 'EUR',
+      category: receipt.category || '',
+      payment_date: receipt.payment_date || ''
+    };
+  }
+  
+  async function saveReceiptEdits() {
+    if (!editingReceipt) return;
+    
+    try {
+      const response = await fetch(`/api/receipts/${editingReceipt.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editForm)
+      });
+      
+      if (!response.ok) throw new Error('Failed to update receipt');
+      
+      await loadReceipts();
+      editingReceipt = null;
+    } catch (err) {
+      alert('Fehler beim Speichern: ' + (err instanceof Error ? err.message : 'Unknown error'));
+    }
+  }
+  
+  async function reanalyzeReceipt(receipt: ReceiptType) {
+    if (!receipt.drive_file_id) {
+      alert('Kein Drive-File für diesen Beleg vorhanden');
+      return;
+    }
+    
+    if (!confirm('Möchten Sie diesen Beleg erneut analysieren lassen?')) return;
+    
+    analyzing = true;
+    try {
+      const response = await fetch('/api/receipts/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          fileId: receipt.drive_file_id,
+          receiptId: receipt.id // Pass existing receipt ID for update
+        })
+      });
+      
+      if (!response.ok) throw new Error('Failed to re-analyze receipt');
+      
+      await loadReceipts();
+      alert('Beleg wurde erfolgreich neu analysiert!');
+    } catch (err) {
+      alert('Fehler bei der Analyse: ' + (err instanceof Error ? err.message : 'Unknown error'));
+    } finally {
+      analyzing = false;
+    }
+  }
+  
   function handleFileSelect(event: Event) {
     const input = event.target as HTMLInputElement;
     if (input.files && input.files[0]) {
@@ -221,10 +275,19 @@
   }
   
   function formatCurrency(amount: number, currency: string = 'EUR') {
-    return new Intl.NumberFormat('de-AT', {
-      style: 'currency',
-      currency: currency
-    }).format(amount);
+    // Ensure currency is a valid ISO code
+    const validCurrency = (!currency || currency === '€' || currency.length !== 3) ? 'EUR' : currency;
+    
+    try {
+      return new Intl.NumberFormat('de-AT', {
+        style: 'currency',
+        currency: validCurrency
+      }).format(amount);
+    } catch (error) {
+      // Fallback formatting if currency code is still invalid
+      console.error('Invalid currency:', currency, error);
+      return `${validCurrency} ${amount.toFixed(2)}`;
+    }
   }
   
   function formatDate(dateString: string) {
@@ -235,7 +298,7 @@
     if (!searchQuery) return true;
     const search = searchQuery.toLowerCase();
     return (
-      receipt.vendor_name?.toLowerCase().includes(search) ||
+      receipt.vendor?.toLowerCase().includes(search) ||
       receipt.invoice_number?.toLowerCase().includes(search) ||
       receipt.description?.toLowerCase().includes(search)
     );
@@ -243,9 +306,10 @@
   
   onMount(async () => {
     await checkAuth();
+    await loadSettings();
     await loadReceipts();
-    // Set default receipts folder ID
-    receiptsFolderId = DRIVE_FOLDERS.RECEIPTS_INBOX;
+    // Set default receipts folder ID from settings
+    receiptsFolderId = settingsFolderId;
     if (activeTab === 'drive') {
       await loadDriveFiles();
     }
@@ -346,18 +410,18 @@
             {#each filteredReceipts as receipt}
               <tr class="hover:bg-ink/5 transition-colors">
                 <td class="px-4 py-3">{formatDate(receipt.invoice_date || receipt.created_at)}</td>
-                <td class="px-4 py-3">{receipt.vendor_name || 'Unbekannt'}</td>
+                <td class="px-4 py-3">{receipt.vendor || 'Unbekannt'}</td>
                 <td class="px-4 py-3 text-sm text-ink/60">{receipt.invoice_number || '-'}</td>
                 <td class="px-4 py-3 text-right font-mono">
-                  {formatCurrency(receipt.total_amount || 0, receipt.currency)}
+                  {formatCurrency(receipt.amount || 0, receipt.currency || 'EUR')}
                 </td>
                 <td class="px-4 py-3 text-center">
                   <span class={`inline-flex px-2 py-1 text-xs rounded-full ${
-                    receipt.payment_status === 'paid' 
+                    receipt.payment_date 
                       ? 'bg-green-100 text-green-700' 
                       : 'bg-amber-100 text-amber-700'
                   }`}>
-                    {receipt.payment_status === 'paid' ? 'Bezahlt' : 'Offen'}
+                    {receipt.payment_date ? 'Bezahlt' : 'Offen'}
                   </span>
                 </td>
                 <td class="px-4 py-3 text-right">
@@ -371,6 +435,21 @@
                       title="Vorschau"
                     >
                       <Eye size={18} />
+                    </button>
+                    <button
+                      on:click={() => startEditingReceipt(receipt)}
+                      class="p-1 text-amber-600 hover:bg-amber-50 rounded"
+                      title="Bearbeiten"
+                    >
+                      <Pencil size={18} />
+                    </button>
+                    <button
+                      on:click={() => reanalyzeReceipt(receipt)}
+                      disabled={analyzing}
+                      class="p-1 text-purple-600 hover:bg-purple-50 rounded disabled:opacity-50"
+                      title="Neu analysieren"
+                    >
+                      <ArrowsClockwise size={18} />
                     </button>
                     {#if receipt.file_url}
                       <a
@@ -519,18 +598,6 @@
                 
                 <div class="flex items-center gap-2">
                   <button
-                    on:click={() => {
-                      fileToMove = file;
-                      showMoveDialog = true;
-                    }}
-                    class="px-3 py-1 bg-ink/10 text-ink rounded-lg hover:bg-ink/20 flex items-center gap-2 text-sm"
-                    title="In anderen Ordner verschieben"
-                  >
-                    <ArrowRight size={16} />
-                    Verschieben
-                  </button>
-                  
-                  <button
                     on:click={() => analyzeReceipt(file.id, file.name)}
                     disabled={analyzing}
                     class="px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-ink/30 flex items-center gap-2 text-sm"
@@ -574,7 +641,7 @@
         <div class="grid grid-cols-2 gap-4">
           <div>
             <p class="text-sm text-ink/60">Lieferant</p>
-            <p class="font-medium">{previewReceipt.vendor_name || 'Unbekannt'}</p>
+            <p class="font-medium">{previewReceipt.vendor || 'Unbekannt'}</p>
           </div>
           <div>
             <p class="text-sm text-ink/60">Belegnummer</p>
@@ -586,18 +653,18 @@
           </div>
           <div>
             <p class="text-sm text-ink/60">Betrag</p>
-            <p class="font-medium">{formatCurrency(previewReceipt.total_amount || 0, previewReceipt.currency)}</p>
+            <p class="font-medium">{formatCurrency(previewReceipt.amount || 0, previewReceipt.currency || 'EUR')}</p>
           </div>
         </div>
         
-        {#if previewReceipt.description}
+        {#if previewReceipt.category}
           <div>
-            <p class="text-sm text-ink/60">Beschreibung</p>
-            <p>{previewReceipt.description}</p>
+            <p class="text-sm text-ink/60">Kategorie</p>
+            <p>{previewReceipt.category}</p>
           </div>
         {/if}
         
-        {#if previewReceipt.line_items && previewReceipt.line_items.length > 0}
+        {#if previewReceipt.items && previewReceipt.items.length > 0}
           <div>
             <p class="text-sm text-ink/60 mb-2">Positionen</p>
             <div class="border border-ink/10 rounded-lg overflow-hidden">
@@ -611,12 +678,12 @@
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-ink/10">
-                  {#each previewReceipt.line_items as item}
+                  {#each previewReceipt.items as item}
                     <tr>
                       <td class="px-3 py-2">{item.description}</td>
                       <td class="px-3 py-2 text-right">{item.quantity}</td>
-                      <td class="px-3 py-2 text-right">{formatCurrency(item.unit_price, previewReceipt.currency)}</td>
-                      <td class="px-3 py-2 text-right">{formatCurrency(item.total_price, previewReceipt.currency)}</td>
+                      <td class="px-3 py-2 text-right">{formatCurrency(item.unitPrice || 0, previewReceipt.currency || 'EUR')}</td>
+                      <td class="px-3 py-2 text-right">{formatCurrency(item.totalPrice || 0, previewReceipt.currency || 'EUR')}</td>
                     </tr>
                   {/each}
                 </tbody>
@@ -629,61 +696,123 @@
   </div>
 {/if}
 
-<!-- Move File Dialog -->
-{#if showMoveDialog && fileToMove}
+<!-- Edit Receipt Modal -->
+{#if editingReceipt}
   <div class="fixed inset-0 bg-ink/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-    <div class="bg-white rounded-lg max-w-md w-full p-6 shadow-xl">
-      <h2 class="text-xl font-bold mb-4">Datei verschieben</h2>
-      
-      <p class="text-sm text-ink/60 mb-4">
-        Verschiebe "{fileToMove.name}" in einen anderen Ordner:
-      </p>
-      
-      <div class="space-y-2 mb-6 max-h-60 overflow-y-auto">
+    <div class="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 shadow-xl">
+      <div class="flex justify-between items-start mb-4">
+        <h2 class="text-xl font-bold">Beleg bearbeiten</h2>
         <button
-          on:click={() => selectedTargetFolder = DRIVE_FOLDERS.RECEIPTS_INBOX}
-          class={`w-full flex items-center gap-3 p-3 border rounded-lg transition-colors text-left ${
-            selectedTargetFolder === DRIVE_FOLDERS.RECEIPTS_INBOX
-              ? 'border-accent-green bg-accent-green/10'
-              : 'border-ink/10 hover:bg-ink/5'
-          }`}
+          on:click={() => editingReceipt = null}
+          class="p-1 hover:bg-ink/10 rounded"
         >
-          <Folder size={20} class="text-amber-600" />
-          <span>Belege (Eingang)</span>
-        </button>
-        
-        <button
-          on:click={() => selectedTargetFolder = DRIVE_FOLDERS.RECEIPTS_ARCHIVE}
-          class={`w-full flex items-center gap-3 p-3 border rounded-lg transition-colors text-left ${
-            selectedTargetFolder === DRIVE_FOLDERS.RECEIPTS_ARCHIVE
-              ? 'border-accent-green bg-accent-green/10'
-              : 'border-ink/10 hover:bg-ink/5'
-          }`}
-        >
-          <Folder size={20} class="text-amber-600" />
-          <span>Belege (Archiv)</span>
+          <X size={24} />
         </button>
       </div>
       
-      <div class="flex justify-end gap-3">
-        <button
-          on:click={() => {
-            showMoveDialog = false;
-            fileToMove = null;
-            selectedTargetFolder = '';
-          }}
-          class="px-4 py-2 text-ink bg-ink/10 rounded-md hover:bg-ink/20"
-        >
-          Abbrechen
-        </button>
-        <button
-          on:click={moveFile}
-          disabled={!selectedTargetFolder}
-          class="px-4 py-2 bg-accent-green text-white rounded-md hover:bg-accent-green/90 disabled:bg-ink/30"
-        >
-          Verschieben
-        </button>
+      <div class="space-y-4">
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-ink mb-2">
+              Lieferant
+            </label>
+            <input
+              type="text"
+              bind:value={editForm.vendor}
+              class="w-full px-3 py-2 border border-ink/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-green/50"
+            />
+          </div>
+          
+          <div>
+            <label class="block text-sm font-medium text-ink mb-2">
+              Belegnummer
+            </label>
+            <input
+              type="text"
+              bind:value={editForm.invoice_number}
+              class="w-full px-3 py-2 border border-ink/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-green/50"
+            />
+          </div>
+          
+          <div>
+            <label class="block text-sm font-medium text-ink mb-2">
+              Belegdatum
+            </label>
+            <input
+              type="date"
+              bind:value={editForm.invoice_date}
+              class="w-full px-3 py-2 border border-ink/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-green/50"
+            />
+          </div>
+          
+          <div>
+            <label class="block text-sm font-medium text-ink mb-2">
+              Zahlungsdatum
+            </label>
+            <input
+              type="date"
+              bind:value={editForm.payment_date}
+              class="w-full px-3 py-2 border border-ink/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-green/50"
+            />
+          </div>
+          
+          <div>
+            <label class="block text-sm font-medium text-ink mb-2">
+              Betrag
+            </label>
+            <input
+              type="number"
+              step="0.01"
+              bind:value={editForm.amount}
+              class="w-full px-3 py-2 border border-ink/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-green/50"
+            />
+          </div>
+          
+          <div>
+            <label class="block text-sm font-medium text-ink mb-2">
+              Währung
+            </label>
+            <select
+              bind:value={editForm.currency}
+              class="w-full px-3 py-2 border border-ink/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-green/50"
+            >
+              <option value="EUR">EUR</option>
+              <option value="USD">USD</option>
+              <option value="GBP">GBP</option>
+              <option value="CHF">CHF</option>
+            </select>
+          </div>
+          
+          <div class="col-span-2">
+            <label class="block text-sm font-medium text-ink mb-2">
+              Kategorie
+            </label>
+            <input
+              type="text"
+              bind:value={editForm.category}
+              placeholder="z.B. Büromaterial, Reisekosten, etc."
+              class="w-full px-3 py-2 border border-ink/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-green/50"
+            />
+          </div>
+        </div>
+        
+        <div class="flex justify-end gap-3 mt-6">
+          <button
+            on:click={() => editingReceipt = null}
+            class="px-4 py-2 bg-ink/10 text-ink rounded-lg hover:bg-ink/20"
+          >
+            Abbrechen
+          </button>
+          <button
+            on:click={saveReceiptEdits}
+            class="px-4 py-2 bg-accent-green text-white rounded-lg hover:bg-accent-green/90 flex items-center gap-2"
+          >
+            <Check size={20} />
+            Speichern
+          </button>
+        </div>
       </div>
     </div>
   </div>
 {/if}
+

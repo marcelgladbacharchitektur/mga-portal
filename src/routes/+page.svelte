@@ -9,7 +9,9 @@
     CheckCircle,
     Timer,
     Receipt,
-    GoogleDriveLogo
+    GoogleDriveLogo,
+    CurrencyCircleDollar,
+    Gear
   } from 'phosphor-svelte';
   
   interface DashboardStats {
@@ -64,8 +66,28 @@
 
 <div class="container mx-auto p-4">
   <div class="mb-8">
-    <h1 class="text-3xl font-bold mb-2">Dashboard</h1>
-    <p class="text-ink/60">Willkommen im MGA Portal</p>
+    <div class="flex items-center justify-between mb-6">
+      <div>
+        <h1 class="text-3xl font-bold mb-2">Dashboard</h1>
+        <p class="text-ink/60">Willkommen im MGA Portal</p>
+      </div>
+      <div class="flex gap-3">
+        <a
+          href="/projekte?action=new"
+          class="px-4 py-2 bg-accent-green text-white rounded-lg hover:bg-accent-green/90 flex items-center gap-2 transition-colors"
+        >
+          <Plus size={20} />
+          <span class="hidden sm:inline">Neues Projekt</span>
+        </a>
+        <a
+          href="/zeiterfassung"
+          class="px-4 py-2 bg-white border border-ink/20 text-ink rounded-lg hover:bg-ink/5 flex items-center gap-2 transition-colors"
+        >
+          <Clock size={20} />
+          <span class="hidden sm:inline">Zeit erfassen</span>
+        </a>
+      </div>
+    </div>
   </div>
   
   {#if loading}
@@ -119,46 +141,92 @@
         </div>
         <div class="space-y-3">
           {#each recentProjects as project}
-            <div class="bg-white rounded-lg shadow-sm border border-ink/10 p-4">
-              <div class="flex items-start justify-between mb-2">
-                <div>
-                  <h3 class="font-medium">{project.name}</h3>
-                  <p class="text-sm text-ink/60">{project.project_id}</p>
+            <a 
+              href="/projekte/{project.id}"
+              class="block bg-white rounded-lg shadow-sm border border-ink/10 p-5 hover:shadow-md hover:border-accent-green/20 transition-all group"
+            >
+              <div class="flex items-start justify-between mb-3">
+                <div class="flex-1">
+                  <h3 class="font-semibold text-lg group-hover:text-accent-green transition-colors">{project.name}</h3>
+                  <p class="text-sm text-ink/60 font-mono">{project.project_id}</p>
                 </div>
-                <span class="text-xs px-2 py-1 rounded-full bg-accent-green/20 text-accent-green">
-                  Aktiv
+                <span class={`text-xs px-2 py-1 rounded-full font-medium ${
+                  project.status === 'ACTIVE' ? 'bg-accent-green/20 text-accent-green' :
+                  project.status === 'ON_HOLD' ? 'bg-yellow-100 text-yellow-800' :
+                  project.status === 'COMPLETED' ? 'bg-blue-100 text-blue-800' :
+                  'bg-ink/10 text-ink/60'
+                }`}>
+                  {project.status === 'ACTIVE' ? 'Aktiv' :
+                   project.status === 'ON_HOLD' ? 'Pausiert' :
+                   project.status === 'COMPLETED' ? 'Abgeschlossen' :
+                   'Archiviert'}
                 </span>
               </div>
-              <div class="flex gap-3 mt-3">
-                <a
-                  href="/projekte/{project.id}"
-                  class="text-xs text-ink/60 hover:text-accent-green"
-                >
-                  Details
-                </a>
-                {#if project.drive_folder_url}
-                  <a
-                    href={project.drive_folder_url}
-                    target="_blank"
-                    class="text-xs text-ink/60 hover:text-accent-green"
+              
+              {#if project.cadastral_community || project.plot_area || project.budget_hours}
+                <div class="grid grid-cols-3 gap-4 text-sm mb-3">
+                  {#if project.cadastral_community}
+                    <div>
+                      <p class="text-ink/60 text-xs">KG</p>
+                      <p class="font-medium">{project.cadastral_community}</p>
+                    </div>
+                  {/if}
+                  {#if project.plot_area}
+                    <div>
+                      <p class="text-ink/60 text-xs">Fläche</p>
+                      <p class="font-medium">{project.plot_area} m²</p>
+                    </div>
+                  {/if}
+                  {#if project.budget_hours}
+                    <div>
+                      <p class="text-ink/60 text-xs">Budget</p>
+                      <p class="font-medium">{project.budget_hours}h</p>
+                    </div>
+                  {/if}
+                </div>
+              {/if}
+              
+              <div class="flex items-center gap-4 pt-3 border-t border-ink/10">
+                {#if project.drive_folder_id}
+                  <button
+                    on:click|preventDefault|stopPropagation={() => window.open(`/projekte/${project.id}/drive`, '_blank')}
+                    class="flex items-center gap-1 text-sm text-ink/60 hover:text-accent-green transition-colors"
                   >
-                    Drive
-                  </a>
+                    <GoogleDriveLogo size={16} />
+                    <span>Drive</span>
+                  </button>
                 {/if}
-                <a
-                  href="/zeiterfassung?project={project.id}"
-                  class="text-xs text-ink/60 hover:text-accent-green"
+                <button
+                  on:click|preventDefault|stopPropagation={() => window.location.href = `/zeiterfassung?project=${project.id}`}
+                  class="flex items-center gap-1 text-sm text-ink/60 hover:text-accent-green transition-colors"
                 >
-                  Zeit erfassen
-                </a>
+                  <Timer size={16} />
+                  <span>Zeit erfassen</span>
+                </button>
+                {#if project.calendar_id}
+                  <button
+                    class="flex items-center gap-1 text-sm text-ink/60 hover:text-accent-green transition-colors"
+                  >
+                    <Calendar size={16} />
+                    <span>Kalender</span>
+                  </button>
+                {/if}
               </div>
-            </div>
+            </a>
           {/each}
           
           {#if recentProjects.length === 0}
-            <p class="text-sm text-ink/60 text-center py-4">
-              Noch keine Projekte vorhanden
-            </p>
+            <div class="bg-ink/5 rounded-lg p-8 text-center">
+              <FolderOpen size={48} class="mx-auto text-ink/30 mb-4" />
+              <p class="text-ink/60 mb-4">Noch keine Projekte vorhanden</p>
+              <a
+                href="/projekte?action=new"
+                class="inline-flex items-center gap-2 px-4 py-2 bg-accent-green text-white rounded-lg hover:bg-accent-green/90 transition-colors"
+              >
+                <Plus size={20} />
+                Erstes Projekt anlegen
+              </a>
+            </div>
           {/if}
         </div>
       </div>
@@ -189,11 +257,61 @@
               {/each}
             </div>
           {:else}
-            <p class="text-sm text-ink/60 text-center py-8">
-              Noch keine Zeiterfassung heute
-            </p>
+            <div class="p-8 text-center">
+              <Timer size={48} class="mx-auto text-ink/30 mb-4" />
+              <p class="text-ink/60 mb-4">Noch keine Zeiterfassung heute</p>
+              <a
+                href="/zeiterfassung"
+                class="inline-flex items-center gap-2 px-4 py-2 bg-accent-green text-white rounded-lg hover:bg-accent-green/90 transition-colors text-sm"
+              >
+                <Clock size={20} />
+                Zeit erfassen
+              </a>
+            </div>
           {/if}
         </div>
+      </div>
+    </div>
+    
+    <!-- Quick Access -->
+    <div class="mt-8">
+      <h2 class="text-xl font-semibold mb-4">Schnellzugriff</h2>
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <a
+          href="/belege"
+          class="bg-white rounded-lg shadow-sm border border-ink/10 p-4 hover:shadow-md hover:border-accent-green/20 transition-all group"
+        >
+          <Receipt size={24} class="text-ink/60 group-hover:text-accent-green mb-2" />
+          <h3 class="font-medium">Belege</h3>
+          <p class="text-sm text-ink/60">Rechnungen verwalten</p>
+        </a>
+        
+        <a
+          href="/finanzen"
+          class="bg-white rounded-lg shadow-sm border border-ink/10 p-4 hover:shadow-md hover:border-accent-green/20 transition-all group"
+        >
+          <CurrencyCircleDollar size={24} class="text-ink/60 group-hover:text-accent-green mb-2" />
+          <h3 class="font-medium">Finanzen</h3>
+          <p class="text-sm text-ink/60">Kontoauszüge & mehr</p>
+        </a>
+        
+        <a
+          href="/kontakte"
+          class="bg-white rounded-lg shadow-sm border border-ink/10 p-4 hover:shadow-md hover:border-accent-green/20 transition-all group"
+        >
+          <Users size={24} class="text-ink/60 group-hover:text-accent-green mb-2" />
+          <h3 class="font-medium">Kontakte</h3>
+          <p class="text-sm text-ink/60">Adressbuch</p>
+        </a>
+        
+        <a
+          href="/einstellungen"
+          class="bg-white rounded-lg shadow-sm border border-ink/10 p-4 hover:shadow-md hover:border-accent-green/20 transition-all group"
+        >
+          <Gear size={24} class="text-ink/60 group-hover:text-accent-green mb-2" />
+          <h3 class="font-medium">Einstellungen</h3>
+          <p class="text-sm text-ink/60">Drive & System</p>
+        </a>
       </div>
     </div>
   {/if}

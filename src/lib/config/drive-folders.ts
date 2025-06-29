@@ -1,9 +1,12 @@
 // Google Drive folder configuration
 export const DRIVE_FOLDERS = {
-  // Incoming receipts folder - where new scans are placed
+  // Main folder for all receipts (organized by year/month)
+  RECEIPTS: '100iNRjpLvKTywgWlDZxdrcTKynHN1tDP',
+  
+  // Legacy inbox folder - no longer used
   RECEIPTS_INBOX: '1NNwUw8J74YGVFtta1MvQG-dEZRvJYujD',
   
-  // Archive folder for organized receipts (by year/month)
+  // Archive folder for organized receipts (by year/month) - same as RECEIPTS
   RECEIPTS_ARCHIVE: '100iNRjpLvKTywgWlDZxdrcTKynHN1tDP',
   
   // Bank statements folder

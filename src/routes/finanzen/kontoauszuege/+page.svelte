@@ -14,9 +14,9 @@
   async function loadBankStatements() {
     loading = true;
     try {
-      // TODO: Implement loading from API
-      // const response = await fetch('/api/bank-statements');
-      // bankStatements = await response.json();
+      const response = await fetch('/api/bank-statements');
+      if (!response.ok) throw new Error('Failed to load bank statements');
+      bankStatements = await response.json();
     } catch (err) {
       error = err instanceof Error ? err.message : 'Fehler beim Laden';
     } finally {
@@ -39,17 +39,25 @@
       const formData = new FormData();
       formData.append('file', selectedFile);
       
-      const response = await fetch('/api/bank-statements/analyze', {
+      const response = await fetch('/api/bank-statements/upload', {
         method: 'POST',
         body: formData
       });
       
-      if (!response.ok) throw new Error('Analyse fehlgeschlagen');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Analyse fehlgeschlagen');
+      }
       
       const result = await response.json();
+      console.log('Analysis result:', result);
       await loadBankStatements();
       
       selectedFile = null;
+      // Reset the file input
+      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+      if (fileInput) fileInput.value = '';
+      
       alert('Kontoauszug wurde erfolgreich analysiert!');
     } catch (err) {
       alert('Fehler bei der Analyse: ' + (err instanceof Error ? err.message : 'Unbekannter Fehler'));
@@ -96,7 +104,7 @@
         </label>
         <input
           type="file"
-          accept=".pdf"
+          accept=".pdf,image/*"
           on:change={handleFileSelect}
           class="w-full px-3 py-2 border border-ink/20 rounded-md"
         />

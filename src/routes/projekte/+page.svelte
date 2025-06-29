@@ -182,14 +182,23 @@
       Fehler: {error}
     </div>
   {:else if filteredProjects.length === 0}
-    <div class="text-center py-12">
-      <Folder size={48} class="mx-auto text-ink/30" />
-      <h3 class="mt-2 text-sm font-medium text-ink">
-        {searchQuery || statusFilter !== 'all' ? 'Keine Projekte gefunden' : 'Keine Projekte'}
+    <div class="bg-ink/5 rounded-lg p-8 text-center">
+      <FolderOpen size={48} class="mx-auto text-ink/30 mb-4" />
+      <h3 class="text-lg font-medium text-ink mb-2">
+        {searchQuery || statusFilter !== 'all' ? 'Keine Projekte gefunden' : 'Noch keine Projekte vorhanden'}
       </h3>
-      <p class="mt-1 text-sm text-ink/60">
-        {searchQuery || statusFilter !== 'all' ? 'Versuchen Sie eine andere Suche.' : 'Nutzen Sie den + Button um Ihr erstes Projekt zu erstellen.'}
+      <p class="text-ink/60 mb-4">
+        {searchQuery || statusFilter !== 'all' ? 'Versuchen Sie eine andere Suche.' : 'Erstellen Sie Ihr erstes Projekt.'}
       </p>
+      {#if !searchQuery && statusFilter === 'all'}
+        <button
+          on:click={() => showCreateDialog = true}
+          class="inline-flex items-center gap-2 px-4 py-2 bg-accent-green text-white rounded-lg hover:bg-accent-green/90 transition-colors"
+        >
+          <Plus size={20} />
+          Erstes Projekt anlegen
+        </button>
+      {/if}
     </div>
   {:else if viewMode === 'grid'}
     <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">

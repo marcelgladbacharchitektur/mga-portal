@@ -1,5 +1,5 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { GEMINI_API_KEY } from '$env/static/private';
+import { env } from '$env/dynamic/private';
 
 export interface BankTransaction {
   date: string;
@@ -25,11 +25,18 @@ export interface BankStatementAnalysis {
 }
 
 export async function analyzeBankStatement(fileBuffer: ArrayBuffer, mimeType: string): Promise<BankStatementAnalysis> {
-  if (!GEMINI_API_KEY) {
+  console.log('analyzeBankStatement called with:', {
+    bufferSize: fileBuffer.byteLength,
+    mimeType,
+    hasApiKey: !!env.GEMINI_API_KEY,
+    apiKeyLength: env.GEMINI_API_KEY?.length
+  });
+  
+  if (!env.GEMINI_API_KEY) {
     throw new Error('Gemini API key not configured');
   }
 
-  const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+  const genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY);
   const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
   const prompt = `Analysiere diesen Kontoauszug und extrahiere alle Transaktionen im JSON-Format:
@@ -63,13 +70,17 @@ export async function analyzeBankStatement(fileBuffer: ArrayBuffer, mimeType: st
       }
     };
 
+    console.log('Calling Gemini API...');
     const result = await model.generateContent([prompt, image]);
     const response = await result.response;
     const text = response.text();
+    console.log('Gemini response received, length:', text.length);
+    console.log('First 500 chars of response:', text.substring(0, 500));
     
     // Extract JSON from response
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
+      console.error('No JSON found in response:', text);
       throw new Error('No valid JSON found in response');
     }
 
@@ -88,8 +99,13 @@ export async function analyzeBankStatement(fileBuffer: ArrayBuffer, mimeType: st
     });
 
     return analysis;
-  } catch (error) {
-    console.error('Bank statement analysis error:', error);
-    throw new Error('Failed to analyze bank statement');
+  } catch (error: any) {
+    console.error('Bank statement analysis error:', {
+      error: error.message,
+      stack: error.stack,
+      apiKeyPresent: !!env.GEMINI_API_KEY,
+      apiKeyLength: env.GEMINI_API_KEY?.length
+    });
+    throw new Error(`Failed to analyze bank statement: ${error.message}`);
   }
 }

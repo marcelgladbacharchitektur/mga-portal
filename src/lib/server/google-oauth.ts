@@ -16,6 +16,12 @@ export function initializeGoogleAuth(accessToken?: string, refreshToken?: string
       access_token: accessToken,
       refresh_token: refreshToken
     });
+    
+    // Set up automatic token refresh
+    oauth2Client.on('tokens', (tokens) => {
+      console.log('New tokens received:', tokens);
+      // In production, you might want to save these new tokens
+    });
   }
   
   return oauth2Client;

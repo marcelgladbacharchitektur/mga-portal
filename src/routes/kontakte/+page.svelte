@@ -126,14 +126,23 @@
       Fehler: {error}
     </div>
   {:else if filteredContacts.length === 0}
-    <div class="text-center py-12">
-      <User size={48} class="mx-auto text-ink/30 mb-4" />
-      <h3 class="text-sm font-medium text-ink">
-        {searchQuery || selectedType !== 'all' ? 'Keine Kontakte gefunden' : 'Keine Kontakte'}
+    <div class="bg-ink/5 rounded-lg p-8 text-center">
+      <Users size={48} class="mx-auto text-ink/30 mb-4" />
+      <h3 class="text-lg font-medium text-ink mb-2">
+        {searchQuery || selectedType !== 'all' ? 'Keine Kontakte gefunden' : 'Noch keine Kontakte vorhanden'}
       </h3>
-      <p class="mt-1 text-sm text-ink/60">
-        {searchQuery || selectedType !== 'all' ? 'Versuchen Sie eine andere Suche.' : 'Nutzen Sie den + Button um Ihren ersten Kontakt zu erstellen.'}
+      <p class="text-ink/60 mb-4">
+        {searchQuery || selectedType !== 'all' ? 'Versuchen Sie eine andere Suche.' : 'Erstellen Sie Ihren ersten Kontakt.'}
       </p>
+      {#if !searchQuery && selectedType === 'all'}
+        <button
+          on:click={() => showCreateDialog = true}
+          class="inline-flex items-center gap-2 px-4 py-2 bg-accent-green text-white rounded-lg hover:bg-accent-green/90 transition-colors"
+        >
+          <Plus size={20} />
+          Ersten Kontakt anlegen
+        </button>
+      {/if}
     </div>
   {:else}
     <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
