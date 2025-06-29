@@ -19,6 +19,16 @@ export async function getSettings(): Promise<AppSettings> {
     return cachedSettings;
   }
 
+  // Default settings
+  const defaultSettings: AppSettings = {
+    drive_folders: {
+      receipts: '100iNRjpLvKTywgWlDZxdrcTKynHN1tDP',
+      receipts_archive: '100iNRjpLvKTywgWlDZxdrcTKynHN1tDP',
+      bank_statements: '1vF8FGdYD4ROcgdmAggL1beLWQrmKXbyF',
+      projects_root: ''
+    }
+  };
+
   try {
     const { data, error } = await supabase
       .from('settings')
@@ -26,33 +36,20 @@ export async function getSettings(): Promise<AppSettings> {
       .eq('key', SETTINGS_KEY)
       .single();
 
-    if (error && error.code !== 'PGRST116') {
-      console.error('Error loading settings:', error);
-    }
-
-    // Default settings
-    const defaultSettings: AppSettings = {
-      drive_folders: {
-        receipts: '100iNRjpLvKTywgWlDZxdrcTKynHN1tDP',
-        receipts_archive: '100iNRjpLvKTywgWlDZxdrcTKynHN1tDP',
-        bank_statements: '1vF8FGdYD4ROcgdmAggL1beLWQrmKXbyF',
-        projects_root: ''
+    if (error) {
+      if (error.code !== 'PGRST116' && !error.message.includes('relation "settings" does not exist')) {
+        console.error('Error loading settings:', error);
       }
-    };
+      cachedSettings = defaultSettings;
+      return cachedSettings;
+    }
 
     cachedSettings = data?.value || defaultSettings;
     return cachedSettings;
   } catch (error) {
     console.error('Error loading settings:', error);
-    // Return default settings on error
-    return {
-      drive_folders: {
-        receipts: '100iNRjpLvKTywgWlDZxdrcTKynHN1tDP',
-        receipts_archive: '100iNRjpLvKTywgWlDZxdrcTKynHN1tDP',
-        bank_statements: '1vF8FGdYD4ROcgdmAggL1beLWQrmKXbyF',
-        projects_root: ''
-      }
-    };
+    cachedSettings = defaultSettings;
+    return cachedSettings;
   }
 }
 

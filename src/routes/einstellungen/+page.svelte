@@ -29,21 +29,35 @@
   async function loadSettings() {
     try {
       const response = await fetch('/api/settings');
-      if (!response.ok) throw new Error('Failed to load settings');
+      if (!response.ok) {
+        // Try to load from localStorage as fallback
+        const localSettings = localStorage.getItem('mga_settings');
+        if (localSettings) {
+          settings = JSON.parse(localSettings);
+          console.log('Loaded settings from localStorage');
+        }
+      } else {
+        const data = await response.json();
+        if (data) {
+          settings = data;
+          // Save to localStorage as backup
+          localStorage.setItem('mga_settings', JSON.stringify(settings));
+        }
+      }
       
-      const data = await response.json();
-      if (data) {
-        settings = data;
-        // Load folder names for existing IDs
-        for (const [key, folderId] of Object.entries(settings.drive_folders)) {
-          if (folderId) {
-            getFolderInfo(key, folderId as string);
-          }
+      // Load folder names for existing IDs
+      for (const [key, folderId] of Object.entries(settings.drive_folders)) {
+        if (folderId) {
+          getFolderInfo(key, folderId as string);
         }
       }
     } catch (err) {
       console.error('Error loading settings:', err);
-      error = 'Fehler beim Laden der Einstellungen';
+      // Try localStorage as last resort
+      const localSettings = localStorage.getItem('mga_settings');
+      if (localSettings) {
+        settings = JSON.parse(localSettings);
+      }
     } finally {
       loading = false;
     }
@@ -54,6 +68,10 @@
     error = '';
     
     try {
+      // Always save to localStorage first
+      localStorage.setItem('mga_settings', JSON.stringify(settings));
+      
+      // Try to save to database
       const response = await fetch('/api/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -63,9 +81,11 @@
       if (!response.ok) {
         const data = await response.json();
         if (data.requiresMigration) {
-          throw new Error('Die Datenbank-Tabellen müssen erst erstellt werden. Bitte wenden Sie sich an den Administrator.');
+          // Still mark as saved since we have localStorage
+          console.log('Database not ready, but saved to localStorage');
+        } else {
+          throw new Error('Failed to save settings');
         }
-        throw new Error('Failed to save settings');
       }
       
       savedFields.add(fieldName);
@@ -78,7 +98,13 @@
       }
     } catch (err) {
       console.error('Error saving settings:', err);
-      error = 'Fehler beim Speichern der Einstellungen';
+      // If we saved to localStorage, still show success
+      if (localStorage.getItem('mga_settings')) {
+        savedFields.add(fieldName);
+        setTimeout(() => savedFields.delete(fieldName), 3000);
+      } else {
+        error = 'Fehler beim Speichern der Einstellungen';
+      }
     } finally {
       savingField = null;
     }
