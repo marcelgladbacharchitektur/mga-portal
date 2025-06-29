@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { Gear, FolderOpen, FloppyDisk, ArrowsClockwise, Check, ExternalLink, Info } from 'phosphor-svelte';
+  import { Gear, FolderOpen, FloppyDisk, ArrowsClockwise, Check, ArrowSquareOut } from 'phosphor-svelte';
   
   interface Settings {
     drive_folders: {
@@ -169,7 +169,7 @@
                   rel="noopener noreferrer"
                   class="text-blue-600 hover:text-blue-700"
                 >
-                  <ExternalLink size={16} />
+                  <ArrowSquareOut size={16} />
                 </a>
               </div>
             {/if}
@@ -214,7 +214,7 @@
                   rel="noopener noreferrer"
                   class="text-blue-600 hover:text-blue-700"
                 >
-                  <ExternalLink size={16} />
+                  <ArrowSquareOut size={16} />
                 </a>
               </div>
             {/if}
@@ -259,7 +259,7 @@
                   rel="noopener noreferrer"
                   class="text-blue-600 hover:text-blue-700"
                 >
-                  <ExternalLink size={16} />
+                  <ArrowSquareOut size={16} />
                 </a>
               </div>
             {/if}
