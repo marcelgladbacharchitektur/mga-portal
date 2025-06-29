@@ -13,12 +13,19 @@
   
   async function loadBankStatements() {
     loading = true;
+    error = '';
     try {
       const response = await fetch('/api/bank-statements');
-      if (!response.ok) throw new Error('Failed to load bank statements');
+      if (!response.ok) {
+        console.error('Failed to load bank statements:', response.status);
+        bankStatements = [];
+        return;
+      }
       bankStatements = await response.json();
     } catch (err) {
+      console.error('Error loading bank statements:', err);
       error = err instanceof Error ? err.message : 'Fehler beim Laden';
+      bankStatements = [];
     } finally {
       loading = false;
     }
@@ -157,10 +164,12 @@
       <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-accent-green"></div>
     </div>
   {:else if bankStatements.length === 0}
-    <div class="text-center py-12 bg-white rounded-lg border border-ink/10">
+    <div class="bg-ink/5 rounded-lg p-8 text-center">
       <Bank size={48} class="mx-auto text-ink/30 mb-4" />
-      <p class="text-ink/60">Noch keine Kontoauszüge importiert</p>
-      <p class="text-sm text-ink/40 mt-2">Laden Sie einen PDF-Kontoauszug hoch, um zu beginnen</p>
+      <h3 class="text-lg font-medium text-ink mb-2">Noch keine Kontoauszüge vorhanden</h3>
+      <p class="text-ink/60 mb-4">
+        {error ? 'Die Kontoauszug-Funktion ist noch nicht eingerichtet.' : 'Laden Sie einen PDF-Kontoauszug hoch, um zu beginnen.'}
+      </p>
     </div>
   {:else}
     <div class="bg-white rounded-lg shadow-sm border border-ink/10 overflow-hidden">
