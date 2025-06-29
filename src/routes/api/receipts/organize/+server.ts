@@ -2,20 +2,37 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { initializeGoogleAuth } from '$lib/server/google-oauth';
 import { google } from 'googleapis';
-
-const ARCHIVE_FOLDER_ID = '100iNRjpLvKTywgWlDZxdrcTKynHN1tDP';
+import { getSettings } from '$lib/server/settings';
 
 export const POST: RequestHandler = async ({ request, cookies }) => {
   try {
     const { fileId, invoiceDate, vendor, amount, invoiceNumber } = await request.json();
     
+    console.log('Receipt organize request:', { fileId, invoiceDate, vendor, amount, invoiceNumber });
+    
     if (!fileId || !invoiceDate) {
       return json({ error: 'File ID and invoice date required' }, { status: 400 });
     }
     
+    // Get settings for the correct archive folder
+    const settings = await getSettings();
+    const ARCHIVE_FOLDER_ID = settings.drive_folders.receipts_archive;
+    
+    console.log('Using archive folder ID:', ARCHIVE_FOLDER_ID);
+    
+    if (!ARCHIVE_FOLDER_ID) {
+      return json({ error: 'Archive folder not configured in settings' }, { status: 400 });
+    }
+    
     // Get Google auth tokens
-    const accessToken = cookies.get('google_access_token');
-    const refreshToken = cookies.get('google_refresh_token');
+    const accessToken = cookies.get('google_access_token') || process.env.GOOGLE_ACCESS_TOKEN;
+    const refreshToken = cookies.get('google_refresh_token') || process.env.GOOGLE_REFRESH_TOKEN;
+    
+    console.log('Auth tokens available:', { 
+      hasAccessToken: !!accessToken, 
+      hasRefreshToken: !!refreshToken,
+      fromCookies: !!cookies.get('google_access_token')
+    });
     
     if (!accessToken) {
       return json({ error: 'Not authenticated with Google' }, { status: 401 });
@@ -35,16 +52,22 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
     let yearFolderId = '';
     const yearFolderName = year.toString();
     
+    console.log('Searching for year folder:', yearFolderName, 'in parent:', ARCHIVE_FOLDER_ID);
+    
     const yearSearchResponse = await drive.files.list({
       q: `name='${yearFolderName}' and '${ARCHIVE_FOLDER_ID}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
       fields: 'files(id, name)',
       spaces: 'drive'
     });
     
+    console.log('Year folder search result:', yearSearchResponse.data.files);
+    
     if (yearSearchResponse.data.files && yearSearchResponse.data.files.length > 0) {
       yearFolderId = yearSearchResponse.data.files[0].id!;
+      console.log('Found existing year folder:', yearFolderId);
     } else {
       // Create year folder
+      console.log('Creating new year folder:', yearFolderName);
       const yearFolderResponse = await drive.files.create({
         requestBody: {
           name: yearFolderName,
@@ -54,6 +77,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
         fields: 'id'
       });
       yearFolderId = yearFolderResponse.data.id!;
+      console.log('Created year folder with ID:', yearFolderId);
     }
     
     // Check if month folder exists
@@ -100,7 +124,14 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
     // Move file to the month folder and rename
     const previousParents = fileMetadata.data.parents?.join(',') || '';
     
-    await drive.files.update({
+    console.log('Moving file:', {
+      fileId,
+      newFileName,
+      monthFolderId,
+      previousParents
+    });
+    
+    const updateResult = await drive.files.update({
       fileId: fileId,
       requestBody: {
         name: newFileName
@@ -110,11 +141,14 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
       fields: 'id, name, parents'
     });
     
+    console.log('File successfully organized:', updateResult.data);
+    
     return json({ 
       success: true,
       message: `File moved to ${yearFolderName}/${monthFolderName}`,
       yearFolder: yearFolderName,
-      monthFolder: monthFolderName
+      monthFolder: monthFolderName,
+      newFileName
     });
   } catch (error: any) {
     console.error('Error organizing receipt:', error);

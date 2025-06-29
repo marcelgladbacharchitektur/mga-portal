@@ -24,30 +24,33 @@ export const GET: RequestHandler = async ({ params, url, cookies }) => {
     const supabase = getSupabaseClient();
     const { data: project } = await supabase
       .from('projects')
-      .select('drive_folder_url')
+      .select('drive_folder_id, drive_folder_url')
       .eq('id', id)
       .single();
     
-    if (!project?.drive_folder_url) {
+    // Use drive_folder_id if available, otherwise try to extract from drive_folder_url
+    let projectFolderId = project?.drive_folder_id;
+    
+    if (!projectFolderId && project?.drive_folder_url) {
+      // Extract folder ID from URL for backward compatibility
+      // Handle different Google Drive URL formats:
+      // - https://drive.google.com/drive/folders/FOLDER_ID
+      // - https://drive.google.com/drive/u/0/folders/FOLDER_ID
+      // - https://drive.google.com/drive/folders/FOLDER_ID?usp=sharing
+      const urlMatch = project.drive_folder_url.match(/folders\/([a-zA-Z0-9-_]+)/);
+      if (urlMatch) {
+        projectFolderId = urlMatch[1];
+      } else {
+        // Fallback to old method
+        projectFolderId = project.drive_folder_url.split('/').pop()?.split('?')[0] || '';
+      }
+    }
+    
+    if (!projectFolderId) {
       return json({ error: 'No Drive folder linked to this project' }, { status: 404 });
     }
     
-    // Extract folder ID from URL
-    // Handle different Google Drive URL formats:
-    // - https://drive.google.com/drive/folders/FOLDER_ID
-    // - https://drive.google.com/drive/u/0/folders/FOLDER_ID
-    // - https://drive.google.com/drive/folders/FOLDER_ID?usp=sharing
-    let projectFolderId = '';
-    const urlMatch = project.drive_folder_url.match(/folders\/([a-zA-Z0-9-_]+)/);
-    if (urlMatch) {
-      projectFolderId = urlMatch[1];
-    } else {
-      // Fallback to old method
-      projectFolderId = project.drive_folder_url.split('/').pop()?.split('?')[0] || '';
-    }
-    
-    console.log('Drive URL:', project.drive_folder_url);
-    console.log('Extracted folder ID:', projectFolderId);
+    console.log('Drive folder ID:', projectFolderId);
     
     // Initialize Google Drive
     const auth = initializeGoogleAuth(accessToken, refreshToken);

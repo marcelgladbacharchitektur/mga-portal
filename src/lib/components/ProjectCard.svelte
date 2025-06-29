@@ -68,15 +68,34 @@
   
   <!-- Quick Links -->
   <div class="mt-3 mb-3 flex flex-wrap gap-2">
-    {#if project.drive_folder_url}
+    <!-- Drive Browser (zeige immer an) -->
+    <span
+      on:click|preventDefault|stopPropagation={() => window.location.href = `/projekte/${project.id}/drive`}
+      class="inline-flex items-center gap-1 px-2 py-1 text-xs bg-ink/5 hover:bg-ink/10 rounded-full transition-colors cursor-pointer relative z-10"
+    >
+      <Folder size={14} />
+      Browser
+    </span>
+    
+    <!-- Direkter Google Drive Link -->
+    {#if project.drive_folder_id || project.drive_folder_url}
       <span
-        on:click|preventDefault|stopPropagation={() => window.location.href = `/projekte/${project.id}/drive`}
+        on:click|preventDefault|stopPropagation={() => {
+          let driveUrl = '';
+          if (project.drive_folder_id) {
+            driveUrl = `https://drive.google.com/drive/folders/${project.drive_folder_id}`;
+          } else if (project.drive_folder_url) {
+            driveUrl = project.drive_folder_url;
+          }
+          if (driveUrl) window.open(driveUrl, '_blank');
+        }}
         class="inline-flex items-center gap-1 px-2 py-1 text-xs bg-ink/5 hover:bg-ink/10 rounded-full transition-colors cursor-pointer relative z-10"
       >
-        <Folder size={14} />
-        Drive Browser
+        <GoogleDriveLogo size={14} />
+        Drive
       </span>
     {/if}
+    
     <span
       on:click|preventDefault|stopPropagation={() => window.location.href = `/zeiterfassung?project=${project.id}`}
       class="inline-flex items-center gap-1 px-2 py-1 text-xs bg-ink/5 hover:bg-ink/10 rounded-full transition-colors cursor-pointer relative z-10"

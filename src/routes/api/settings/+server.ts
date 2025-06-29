@@ -1,5 +1,5 @@
 import { json } from '@sveltejs/kit';
-import { supabase } from '$lib/server/supabase';
+import { getSupabaseClient } from '$lib/server/supabase';
 import type { RequestHandler } from './$types';
 
 const SETTINGS_KEY = 'app_settings';
@@ -7,6 +7,7 @@ const SETTINGS_KEY = 'app_settings';
 export const GET: RequestHandler = async () => {
   try {
     // Get settings from database
+    const supabase = getSupabaseClient();
     const { data, error } = await supabase
       .from('settings')
       .select('value')
@@ -42,6 +43,7 @@ export const GET: RequestHandler = async () => {
 export const POST: RequestHandler = async ({ request }) => {
   try {
     const settings = await request.json();
+    const supabase = getSupabaseClient();
 
     // First, try to create the table if it doesn't exist
     try {

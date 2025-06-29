@@ -1,6 +1,44 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getSupabaseClient } from '$lib/server/supabase';
+import { initializeGoogleAuth } from '$lib/server/google-oauth';
+import { google } from 'googleapis';
+
+async function renameDriveFolder(project: any, updateData: any) {
+  // Generate new folder name based on project data
+  const newProjectId = updateData.project_id || project.project_id;
+  const newName = updateData.name || project.name;
+  const newFolderName = `${newProjectId} - ${newName}`;
+  
+  console.log('Renaming Drive folder to:', newFolderName);
+  
+  // Try to get auth tokens from environment variables
+  // In a production setup, you might want to store these per user
+  const accessToken = process.env.GOOGLE_ACCESS_TOKEN;
+  const refreshToken = process.env.GOOGLE_REFRESH_TOKEN;
+  
+  if (!accessToken) {
+    console.log('No Google access token available for folder rename');
+    return;
+  }
+  
+  try {
+    const auth = initializeGoogleAuth(accessToken, refreshToken);
+    const drive = google.drive({ version: 'v3', auth });
+    
+    await drive.files.update({
+      fileId: project.drive_folder_id,
+      requestBody: {
+        name: newFolderName
+      }
+    });
+    
+    console.log('Drive folder renamed successfully');
+  } catch (error) {
+    console.error('Failed to rename Drive folder:', error);
+    throw error;
+  }
+}
 
 export const GET: RequestHandler = async ({ params }) => {
   try {
@@ -31,13 +69,20 @@ export const PATCH: RequestHandler = async ({ params, request }) => {
     
     // Update the project
     const updateData: any = {
-      name: data.name,
-      status: data.status,
-      cadastral_community: data.cadastral_community || null,
-      plot_area: data.plot_area ? parseFloat(data.plot_area) : null,
-      budget_hours: data.budget_hours ? parseInt(data.budget_hours) : null,
       updated_at: new Date().toISOString()
     };
+    
+    // Only update fields that are provided
+    if (data.name !== undefined) updateData.name = data.name;
+    if (data.project_id !== undefined) updateData.project_id = data.project_id;
+    if (data.status !== undefined) updateData.status = data.status;
+    if (data.cadastral_community !== undefined) updateData.cadastral_community = data.cadastral_community || null;
+    if (data.plot_area !== undefined) updateData.plot_area = data.plot_area ? parseFloat(data.plot_area) : null;
+    if (data.budget_hours !== undefined) updateData.budget_hours = data.budget_hours ? parseInt(data.budget_hours) : null;
+    if (data.drive_folder_id !== undefined) updateData.drive_folder_id = data.drive_folder_id || null;
+    if (data.calendar_id !== undefined) updateData.calendar_id = data.calendar_id || null;
+    if (data.tasks_list_id !== undefined) updateData.tasks_list_id = data.tasks_list_id || null;
+    if (data.description !== undefined) updateData.description = data.description || null;
     
     const { data: project, error } = await supabase
       .from('projects')
@@ -47,6 +92,16 @@ export const PATCH: RequestHandler = async ({ params, request }) => {
       .single();
     
     if (error) throw error;
+    
+    // Handle Drive folder renaming if requested
+    if (data.renameDriveFolder && project.drive_folder_id && (data.name || data.project_id)) {
+      try {
+        await renameDriveFolder(project, data);
+      } catch (driveError) {
+        console.error('Drive folder rename failed:', driveError);
+        // Don't fail the whole request if drive rename fails
+      }
+    }
     
     return json(project);
   } catch (error) {

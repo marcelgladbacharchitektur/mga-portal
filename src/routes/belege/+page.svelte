@@ -10,6 +10,8 @@
   let error = '';
   let uploading = false;
   let analyzing = false;
+  let analysisProgress = 0;
+  let analysisStep = '';
   let searchQuery = '';
   let selectedFile: File | null = null;
   let receiptsFolderId = '';
@@ -76,6 +78,12 @@
       // Use provided folder ID or default to settings folder
       const targetFolderId = folderId || settingsFolderId;
       
+      // Don't try to load if we don't have a folder ID
+      if (!targetFolderId) {
+        console.log('No folder ID available, skipping drive files load');
+        return;
+      }
+      
       if (!folderId) {
         receiptsFolderId = settingsFolderId;
         currentFolderId = settingsFolderId;
@@ -118,12 +126,22 @@
   
   async function analyzeReceipt(fileId: string, filename: string) {
     analyzing = true;
+    analysisProgress = 0;
+    analysisStep = 'Datei wird vorbereitet...';
+    
     try {
+      // Simulate progress steps
+      analysisProgress = 10;
+      analysisStep = 'Datei wird an KI gesendet...';
+      
       const response = await fetch('/api/receipts/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fileId })
       });
+      
+      analysisProgress = 60;
+      analysisStep = 'Beleg wird analysiert...';
       
       if (!response.ok) {
         const error = await response.json();
@@ -131,15 +149,28 @@
         throw new Error(error.details || error.error || 'Failed to analyze receipt');
       }
       
+      analysisProgress = 90;
+      analysisStep = 'Ergebnisse werden gespeichert...';
+      
       const result = await response.json();
       await loadReceipts(); // Reload to show new receipt
       
-      alert(`Beleg "${filename}" wurde erfolgreich analysiert!`);
+      analysisProgress = 100;
+      analysisStep = 'Abgeschlossen!';
+      
+      // Show completion briefly
+      setTimeout(() => {
+        alert(`Beleg "${filename}" wurde erfolgreich analysiert!`);
+      }, 500);
     } catch (err) {
       console.error('Receipt analysis error:', err);
       alert('Fehler bei der Analyse: ' + (err instanceof Error ? err.message : 'Unknown error'));
     } finally {
-      analyzing = false;
+      setTimeout(() => {
+        analyzing = false;
+        analysisProgress = 0;
+        analysisStep = '';
+      }, 1000);
     }
   }
   
@@ -151,6 +182,9 @@
     
     console.log('Starting upload...', selectedFile.name);
     uploading = true;
+    analysisProgress = 0;
+    analysisStep = 'Datei wird hochgeladen...';
+    
     try {
       const formData = new FormData();
       formData.append('file', selectedFile);
@@ -172,6 +206,8 @@
       
       const uploadedFile = await response.json();
       console.log('Upload successful:', uploadedFile);
+      
+      analysisStep = 'Upload abgeschlossen, starte Analyse...';
       
       // Automatically analyze after upload
       await analyzeReceipt(uploadedFile.id, uploadedFile.name);
@@ -246,7 +282,13 @@
     if (!confirm('Möchten Sie diesen Beleg erneut analysieren lassen?')) return;
     
     analyzing = true;
+    analysisProgress = 0;
+    analysisStep = 'Neu-Analyse wird vorbereitet...';
+    
     try {
+      analysisProgress = 20;
+      analysisStep = 'Beleg wird neu an KI gesendet...';
+      
       const response = await fetch('/api/receipts/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -256,14 +298,30 @@
         })
       });
       
+      analysisProgress = 70;
+      analysisStep = 'Neue Analyse läuft...';
+      
       if (!response.ok) throw new Error('Failed to re-analyze receipt');
       
+      analysisProgress = 90;
+      analysisStep = 'Aktualisierte Daten werden gespeichert...';
+      
       await loadReceipts();
-      alert('Beleg wurde erfolgreich neu analysiert!');
+      
+      analysisProgress = 100;
+      analysisStep = 'Neu-Analyse abgeschlossen!';
+      
+      setTimeout(() => {
+        alert('Beleg wurde erfolgreich neu analysiert!');
+      }, 500);
     } catch (err) {
       alert('Fehler bei der Analyse: ' + (err instanceof Error ? err.message : 'Unknown error'));
     } finally {
-      analyzing = false;
+      setTimeout(() => {
+        analyzing = false;
+        analysisProgress = 0;
+        analysisStep = '';
+      }, 1000);
     }
   }
   
@@ -519,19 +577,57 @@
           
           <button
             on:click={uploadReceipt}
-            disabled={!selectedFile || uploading || !isAuthenticated}
+            disabled={!selectedFile || uploading || analyzing || !isAuthenticated}
             class="w-full px-4 py-2 bg-accent-green text-white rounded-lg hover:bg-accent-green/90 disabled:bg-ink/30 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
-            {#if uploading}
+            {#if uploading || analyzing}
               <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-              Wird hochgeladen...
+              {uploading ? 'Wird hochgeladen...' : 'Wird analysiert...'}
             {:else}
               <Upload size={20} />
               Hochladen & Analysieren
             {/if}
           </button>
+          
+          <!-- Progress Bar -->
+          {#if (uploading || analyzing) && analysisStep}
+            <div class="mt-4 space-y-2">
+              <div class="flex justify-between text-sm">
+                <span class="text-ink/70">{analysisStep}</span>
+                <span class="text-ink/70">{analysisProgress}%</span>
+              </div>
+              <div class="w-full bg-ink/10 rounded-full h-2">
+                <div 
+                  class="bg-accent-green h-2 rounded-full transition-all duration-300"
+                  style="width: {analysisProgress}%"
+                ></div>
+              </div>
+            </div>
+          {/if}
         </div>
       </div>
+      
+      <!-- Analysis Progress (Global) -->
+      {#if analyzing && analysisStep}
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+          <div class="flex items-center gap-3 mb-3">
+            <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+            <span class="font-medium text-blue-900">Analyse läuft...</span>
+          </div>
+          <div class="space-y-2">
+            <div class="flex justify-between text-sm">
+              <span class="text-blue-700">{analysisStep}</span>
+              <span class="text-blue-700">{analysisProgress}%</span>
+            </div>
+            <div class="w-full bg-blue-200 rounded-full h-2">
+              <div 
+                class="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                style="width: {analysisProgress}%"
+              ></div>
+            </div>
+          </div>
+        </div>
+      {/if}
       
       <!-- Drive Files -->
       <div class="bg-white rounded-lg shadow-sm border border-ink/10 p-6">

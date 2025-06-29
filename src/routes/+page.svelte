@@ -11,7 +11,9 @@
     Receipt,
     GoogleDriveLogo,
     CurrencyCircleDollar,
-    Gear
+    Gear,
+    ListChecks,
+    Folder
   } from 'phosphor-svelte';
   
   interface DashboardStats {
@@ -186,31 +188,83 @@
                 </div>
               {/if}
               
-              <div class="flex items-center gap-4 pt-3 border-t border-ink/10">
-                {#if project.drive_folder_id}
+              <div class="flex items-center gap-3 pt-3 border-t border-ink/10 flex-wrap">
+                <!-- Projekt Details anzeigen -->
+                <button
+                  on:click|preventDefault|stopPropagation={() => window.location.href = `/projekte/${project.id}`}
+                  class="flex items-center gap-1 text-sm text-accent-green hover:text-accent-green/80 transition-colors font-medium"
+                >
+                  <FolderOpen size={16} />
+                  <span>Details</span>
+                </button>
+                
+                <!-- Drive Browser (zeige immer an) -->
+                <button
+                  on:click|preventDefault|stopPropagation={() => window.open(`/projekte/${project.id}/drive`, '_blank')}
+                  class="flex items-center gap-1 text-sm text-ink/60 hover:text-accent-green transition-colors"
+                >
+                  <Folder size={16} />
+                  <span>Browser</span>
+                </button>
+                
+                <!-- Direkter Google Drive Link -->
+                {#if project.drive_folder_id || project.drive_folder_url}
                   <button
-                    on:click|preventDefault|stopPropagation={() => window.open(`/projekte/${project.id}/drive`, '_blank')}
+                    on:click|preventDefault|stopPropagation={() => {
+                      let driveUrl = '';
+                      if (project.drive_folder_id) {
+                        driveUrl = `https://drive.google.com/drive/folders/${project.drive_folder_id}`;
+                      } else if (project.drive_folder_url) {
+                        driveUrl = project.drive_folder_url;
+                      }
+                      if (driveUrl) window.open(driveUrl, '_blank');
+                    }}
                     class="flex items-center gap-1 text-sm text-ink/60 hover:text-accent-green transition-colors"
                   >
                     <GoogleDriveLogo size={16} />
                     <span>Drive</span>
                   </button>
                 {/if}
+                
+                <!-- Zeit erfassen -->
                 <button
                   on:click|preventDefault|stopPropagation={() => window.location.href = `/zeiterfassung?project=${project.id}`}
                   class="flex items-center gap-1 text-sm text-ink/60 hover:text-accent-green transition-colors"
                 >
                   <Timer size={16} />
-                  <span>Zeit erfassen</span>
+                  <span>Zeit</span>
                 </button>
+                
+                <!-- Kalender -->
                 {#if project.calendar_id}
                   <button
+                    on:click|preventDefault|stopPropagation
                     class="flex items-center gap-1 text-sm text-ink/60 hover:text-accent-green transition-colors"
                   >
                     <Calendar size={16} />
                     <span>Kalender</span>
                   </button>
                 {/if}
+                
+                <!-- Tasks -->
+                {#if project.tasks_list_id}
+                  <button
+                    on:click|preventDefault|stopPropagation
+                    class="flex items-center gap-1 text-sm text-ink/60 hover:text-accent-green transition-colors"
+                  >
+                    <ListChecks size={16} />
+                    <span>Tasks</span>
+                  </button>
+                {/if}
+                
+                <!-- Kontakte (zeige immer an) -->
+                <button
+                  on:click|preventDefault|stopPropagation={() => window.location.href = `/projekte/${project.id}#contacts`}
+                  class="flex items-center gap-1 text-sm text-ink/60 hover:text-accent-green transition-colors"
+                >
+                  <Users size={16} />
+                  <span>Kontakte</span>
+                </button>
               </div>
             </a>
           {/each}

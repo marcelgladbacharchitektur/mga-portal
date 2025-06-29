@@ -8,6 +8,8 @@
   let error = '';
   let selectedFile: File | null = null;
   let analyzing = false;
+  let analysisProgress = 0;
+  let analysisStep = '';
   let searchQuery = '';
   let selectedStatement: any = null;
   
@@ -42,34 +44,62 @@
     if (!selectedFile) return;
     
     analyzing = true;
+    analysisProgress = 0;
+    analysisStep = 'Kontoauszug wird vorbereitet...';
+    
     try {
+      analysisProgress = 10;
+      analysisStep = 'PDF wird hochgeladen...';
+      
       const formData = new FormData();
       formData.append('file', selectedFile);
+      
+      analysisProgress = 30;
+      analysisStep = 'Datei wird an KI gesendet...';
       
       const response = await fetch('/api/bank-statements/upload', {
         method: 'POST',
         body: formData
       });
       
+      analysisProgress = 60;
+      analysisStep = 'Transaktionen werden analysiert...';
+      
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Analyse fehlgeschlagen');
       }
       
+      analysisProgress = 85;
+      analysisStep = 'Ergebnisse werden verarbeitet...';
+      
       const result = await response.json();
       console.log('Analysis result:', result);
+      
+      analysisProgress = 95;
+      analysisStep = 'Daten werden gespeichert...';
+      
       await loadBankStatements();
+      
+      analysisProgress = 100;
+      analysisStep = 'Analyse abgeschlossen!';
       
       selectedFile = null;
       // Reset the file input
       const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
       if (fileInput) fileInput.value = '';
       
-      alert('Kontoauszug wurde erfolgreich analysiert!');
+      setTimeout(() => {
+        alert('Kontoauszug wurde erfolgreich analysiert!');
+      }, 500);
     } catch (err) {
       alert('Fehler bei der Analyse: ' + (err instanceof Error ? err.message : 'Unbekannter Fehler'));
     } finally {
-      analyzing = false;
+      setTimeout(() => {
+        analyzing = false;
+        analysisProgress = 0;
+        analysisStep = '';
+      }, 1000);
     }
   }
   
@@ -142,8 +172,46 @@
           Importieren & Analysieren
         {/if}
       </button>
+      
+      <!-- Progress Bar -->
+      {#if analyzing && analysisStep}
+        <div class="mt-4 space-y-2">
+          <div class="flex justify-between text-sm">
+            <span class="text-ink/70">{analysisStep}</span>
+            <span class="text-ink/70">{analysisProgress}%</span>
+          </div>
+          <div class="w-full bg-ink/10 rounded-full h-2">
+            <div 
+              class="bg-accent-green h-2 rounded-full transition-all duration-300"
+              style="width: {analysisProgress}%"
+            ></div>
+          </div>
+        </div>
+      {/if}
     </div>
   </div>
+  
+  <!-- Analysis Progress (Global) -->
+  {#if analyzing && analysisStep}
+    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+      <div class="flex items-center gap-3 mb-3">
+        <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+        <span class="font-medium text-blue-900">Kontoauszug-Analyse läuft...</span>
+      </div>
+      <div class="space-y-2">
+        <div class="flex justify-between text-sm">
+          <span class="text-blue-700">{analysisStep}</span>
+          <span class="text-blue-700">{analysisProgress}%</span>
+        </div>
+        <div class="w-full bg-blue-200 rounded-full h-2">
+          <div 
+            class="bg-blue-600 h-2 rounded-full transition-all duration-300"
+            style="width: {analysisProgress}%"
+          ></div>
+        </div>
+      </div>
+    </div>
+  {/if}
   
   <!-- Search -->
   <div class="mb-6">

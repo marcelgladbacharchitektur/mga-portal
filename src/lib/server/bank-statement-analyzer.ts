@@ -77,28 +77,64 @@ export async function analyzeBankStatement(fileBuffer: ArrayBuffer, mimeType: st
     console.log('Gemini response received, length:', text.length);
     console.log('First 500 chars of response:', text.substring(0, 500));
     
-    // Extract JSON from response
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    // Try to extract and fix JSON from response
+    let jsonStr = text;
+    
+    // Remove markdown code blocks if present
+    const codeBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (codeBlockMatch) {
+      jsonStr = codeBlockMatch[1].trim();
+    }
+    
+    // Extract JSON object
+    const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       console.error('No JSON found in response:', text);
       throw new Error('No valid JSON found in response');
     }
-
-    const analysis = JSON.parse(jsonMatch[0]) as BankStatementAnalysis;
     
-    // Validate and clean data
-    analysis.transactions = analysis.transactions || [];
-    analysis.transactions.forEach(transaction => {
-      if (transaction.date) {
-        // Ensure date is in correct format
-        const date = new Date(transaction.date);
-        if (!isNaN(date.getTime())) {
-          transaction.date = date.toISOString().split('T')[0];
-        }
+    let rawJson = jsonMatch[0];
+    
+    // Try to fix common JSON issues
+    try {
+      // First attempt - parse as is
+      const analysis = JSON.parse(rawJson) as BankStatementAnalysis;
+      console.log('JSON parsed successfully on first attempt');
+      return processAnalysis(analysis);
+    } catch (firstError: any) {
+      console.log('First JSON parse failed, attempting to fix:', firstError.message);
+      
+      // Try to fix incomplete JSON by adding missing closing brackets
+      let fixedJson = rawJson;
+      
+      // Count opening and closing brackets
+      const openBrackets = (fixedJson.match(/\{/g) || []).length;
+      const closeBrackets = (fixedJson.match(/\}/g) || []).length;
+      const openArrays = (fixedJson.match(/\[/g) || []).length;
+      const closeArrays = (fixedJson.match(/\]/g) || []).length;
+      
+      // Add missing closing brackets
+      for (let i = 0; i < openArrays - closeArrays; i++) {
+        fixedJson += ']';
       }
-    });
-
-    return analysis;
+      for (let i = 0; i < openBrackets - closeBrackets; i++) {
+        fixedJson += '}';
+      }
+      
+      // Try to remove trailing comma before closing brackets
+      fixedJson = fixedJson.replace(/,(\s*[}\]])/g, '$1');
+      
+      try {
+        const analysis = JSON.parse(fixedJson) as BankStatementAnalysis;
+        console.log('JSON parsed successfully after fixing');
+        return processAnalysis(analysis);
+      } catch (secondError: any) {
+        console.error('Failed to parse even after fixes:', secondError.message);
+        console.error('Original JSON:', rawJson.substring(0, 1000));
+        console.error('Fixed JSON:', fixedJson.substring(0, 1000));
+        throw new Error(`Failed to parse JSON response: ${secondError.message}`);
+      }
+    }
   } catch (error: any) {
     console.error('Bank statement analysis error:', {
       error: error.message,
@@ -108,4 +144,20 @@ export async function analyzeBankStatement(fileBuffer: ArrayBuffer, mimeType: st
     });
     throw new Error(`Failed to analyze bank statement: ${error.message}`);
   }
+}
+
+function processAnalysis(analysis: BankStatementAnalysis): BankStatementAnalysis {
+  // Validate and clean data
+  analysis.transactions = analysis.transactions || [];
+  analysis.transactions.forEach(transaction => {
+    if (transaction.date) {
+      // Ensure date is in correct format
+      const date = new Date(transaction.date);
+      if (!isNaN(date.getTime())) {
+        transaction.date = date.toISOString().split('T')[0];
+      }
+    }
+  });
+
+  return analysis;
 }
