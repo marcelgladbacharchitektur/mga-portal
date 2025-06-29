@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { Bank, Upload, FileText, MagnifyingGlass, Calendar, ArrowRight, X } from 'phosphor-svelte';
+  import { Bank, Upload, FileText, MagnifyingGlass, Calendar, ArrowRight, X, Pencil, Trash, Eye } from 'phosphor-svelte';
   
   let bankStatements: any[] = [];
   let transactions: any[] = [];
@@ -12,6 +12,8 @@
   let analysisStep = '';
   let searchQuery = '';
   let selectedStatement: any = null;
+  let editingStatement: any = null;
+  let showStatementDetails = false;
   
   async function loadBankStatements() {
     loading = true;
@@ -112,6 +114,32 @@
   
   function formatDate(dateString: string) {
     return new Date(dateString).toLocaleDateString('de-AT');
+  }
+  
+  function viewStatementDetails(statement: any) {
+    selectedStatement = statement;
+    showStatementDetails = true;
+  }
+  
+  function editStatement(statement: any) {
+    editingStatement = statement;
+  }
+  
+  async function deleteStatement(statement: any) {
+    if (!confirm('Möchten Sie diesen Kontoauszug wirklich löschen?')) return;
+    
+    try {
+      // Delete the bank account (which should cascade to transactions)
+      const response = await fetch(`/api/bank-statements/${statement.bank_account_id}`, {
+        method: 'DELETE'
+      });
+      
+      if (!response.ok) throw new Error('Failed to delete bank statement');
+      
+      await loadBankStatements();
+    } catch (err) {
+      alert('Fehler beim Löschen: ' + (err instanceof Error ? err.message : 'Unbekannter Fehler'));
+    }
   }
   
   onMount(() => {
@@ -263,12 +291,32 @@
                 {formatCurrency(statement.ending_balance || 0)}
               </td>
               <td class="px-4 py-3 text-right">
-                <button
-                  on:click={() => selectedStatement = statement}
-                  class="text-accent-green hover:text-accent-green/80"
-                >
-                  Details →
-                </button>
+                <div class="flex justify-end gap-1">
+                  <button
+                    on:click={() => viewStatementDetails(statement)}
+                    class="px-2 py-1 text-xs bg-blue-100 text-blue-700 hover:bg-blue-200 rounded transition-colors"
+                    title="Details anzeigen"
+                  >
+                    <Eye size={14} class="inline mr-1" />
+                    Details
+                  </button>
+                  <button
+                    on:click={() => editStatement(statement)}
+                    class="px-2 py-1 text-xs bg-amber-100 text-amber-700 hover:bg-amber-200 rounded transition-colors"
+                    title="Bearbeiten"
+                  >
+                    <Pencil size={14} class="inline mr-1" />
+                    Bearbeiten
+                  </button>
+                  <button
+                    on:click={() => deleteStatement(statement)}
+                    class="px-2 py-1 text-xs bg-red-100 text-red-700 hover:bg-red-200 rounded transition-colors"
+                    title="Löschen"
+                  >
+                    <Trash size={14} class="inline mr-1" />
+                    Löschen
+                  </button>
+                </div>
               </td>
             </tr>
           {/each}

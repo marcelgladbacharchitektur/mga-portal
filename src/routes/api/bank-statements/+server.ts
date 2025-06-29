@@ -22,19 +22,24 @@ export const GET: RequestHandler = async ({ url }) => {
       return json([]);
     }
     
-    // Get bank accounts with their transaction summaries
-    const { data: bankAccounts, error } = await supabase
+    // Get bank accounts first
+    const { data: bankAccounts, error: accountsError } = await supabase
       .from('bank_accounts')
-      .select(`
-        *,
-        bank_transactions (
-          id,
-          transaction_date,
-          amount,
-          transaction_type
-        )
-      `)
+      .select('*')
       .order('created_at', { ascending: false });
+    
+    if (accountsError) {
+      console.error('Error loading bank accounts:', accountsError);
+      return json([]);
+    }
+    
+    // Get transactions separately to avoid relationship conflicts
+    const { data: allTransactions, error: transactionsError } = await supabase
+      .from('bank_transactions')
+      .select('*')
+      .order('transaction_date', { ascending: false });
+    
+    const error = transactionsError;
     
     if (error) {
       console.error('Error loading bank accounts:', error);
@@ -49,7 +54,8 @@ export const GET: RequestHandler = async ({ url }) => {
     // Process bank accounts to include summary information
     try {
       const processedAccounts = bankAccounts.flatMap(account => {
-        const transactions = account.bank_transactions || [];
+        // Filter transactions for this account
+        const transactions = allTransactions?.filter(t => t.bank_account_id === account.id) || [];
         
         if (transactions.length === 0) {
           // Return a single statement for accounts without transactions

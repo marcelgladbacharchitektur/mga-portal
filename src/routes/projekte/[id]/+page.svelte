@@ -4,7 +4,7 @@
   import type { Project } from '$lib/types';
   import ProjectContacts from '$lib/components/ProjectContacts.svelte';
   import ProjectTimeOverview from '$lib/components/ProjectTimeOverview.svelte';
-  import { GoogleDriveLogo, Calendar, ListChecks, Clock, Folder, ArrowLeft, Pencil, Check, X } from 'phosphor-svelte';
+  import { GoogleDriveLogo, Calendar, ListChecks, Clock, Folder, ArrowLeft, Pencil, Check, X, Images } from 'phosphor-svelte';
   
   let project: Project | null = null;
   let loading = true;
@@ -30,7 +30,8 @@
     budget_hours: '',
     calendar_id: '',
     tasks_list_id: '',
-    description: ''
+    description: '',
+    photos_album_id: ''
   };
   let savingDetails = false;
   
@@ -161,7 +162,8 @@
       budget_hours: project?.budget_hours?.toString() || '',
       calendar_id: project?.calendar_id || '',
       tasks_list_id: project?.tasks_list_id || '',
-      description: project?.description || ''
+      description: project?.description || '',
+      photos_album_id: project?.photos_album_id || ''
     };
     editingDetails = true;
   }
@@ -184,7 +186,8 @@
         budget_hours: editForm.budget_hours ? parseInt(editForm.budget_hours) : null,
         calendar_id: editForm.calendar_id || null,
         tasks_list_id: editForm.tasks_list_id || null,
-        description: editForm.description || null
+        description: editForm.description || null,
+        photos_album_id: editForm.photos_album_id || null
       };
       
       // Only rename drive folder if name or project_id changed
@@ -405,6 +408,22 @@
               </div>
             </div>
             
+            <!-- Google Photos -->
+            <div class="grid grid-cols-1 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-ink mb-2">Google Photos Album ID</label>
+                <input
+                  type="text"
+                  bind:value={editForm.photos_album_id}
+                  placeholder="Shared album ID"
+                  class="w-full px-3 py-2 border border-ink/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-green/50 font-mono text-sm"
+                />
+                <p class="text-xs text-ink/60 mt-1">
+                  Album ID aus der geteilten Google Photos URL (nach "album/")
+                </p>
+              </div>
+            </div>
+            
             <!-- Description -->
             <div>
               <label class="block text-sm font-medium text-ink mb-2">Beschreibung</label>
@@ -480,6 +499,13 @@
               <div class="space-y-1">
                 <p class="text-sm text-ink/60">Tasks Liste ID</p>
                 <p class="font-mono text-sm text-ink/70">{project.tasks_list_id}</p>
+              </div>
+            {/if}
+            
+            {#if project.photos_album_id}
+              <div class="space-y-1">
+                <p class="text-sm text-ink/60">Photos Album ID</p>
+                <p class="font-mono text-sm text-ink/70">{project.photos_album_id}</p>
               </div>
             {/if}
             
@@ -588,6 +614,16 @@
           >
             <ListChecks size={24} class="text-ink/60" />
             <span>Aufgaben</span>
+          </button>
+        {/if}
+        
+        {#if project.photos_album_id}
+          <button
+            on:click={() => window.open(`https://photos.google.com/share/${project.photos_album_id}`, '_blank')}
+            class="flex items-center justify-center gap-3 p-4 bg-white rounded-lg shadow-sm border border-ink/10 hover:shadow-md transition-shadow"
+          >
+            <Images size={24} class="text-ink/60" />
+            <span>Fotos</span>
           </button>
         {/if}
         

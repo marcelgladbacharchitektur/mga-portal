@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Project } from '$lib/types';
-  import { MapPin, Ruler, Clock, GoogleDriveLogo, Calendar, ListChecks, PencilSimple, Folder, Users } from 'phosphor-svelte';
+  import { MapPin, Ruler, Clock, GoogleDriveLogo, Calendar, ListChecks, PencilSimple, Folder, Users, Images } from 'phosphor-svelte';
   import { createEventDispatcher } from 'svelte';
   
   export let project: Project;
@@ -139,6 +139,17 @@
           aria-label="Google Tasks öffnen"
         >
           <ListChecks size={20} />
+        </button>
+      {/if}
+      
+      {#if project.photos_album_id}
+        <button
+          on:click|preventDefault|stopPropagation={() => window.open(`https://photos.google.com/share/${project.photos_album_id}`, '_blank')}
+          class="text-ink/60 hover:text-accent-green transition-colors relative z-10"
+          title="Google Photos Album"
+          aria-label="Google Photos Album öffnen"
+        >
+          <Images size={20} />
         </button>
       {/if}
     </div>

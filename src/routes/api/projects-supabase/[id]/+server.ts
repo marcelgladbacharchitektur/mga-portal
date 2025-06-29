@@ -83,6 +83,7 @@ export const PATCH: RequestHandler = async ({ params, request }) => {
     if (data.calendar_id !== undefined) updateData.calendar_id = data.calendar_id || null;
     if (data.tasks_list_id !== undefined) updateData.tasks_list_id = data.tasks_list_id || null;
     if (data.description !== undefined) updateData.description = data.description || null;
+    if (data.photos_album_id !== undefined) updateData.photos_album_id = data.photos_album_id || null;
     
     const { data: project, error } = await supabase
       .from('projects')

@@ -483,49 +483,54 @@
                   </span>
                 </td>
                 <td class="px-4 py-3 text-right">
-                  <div class="flex justify-end gap-2">
+                  <div class="flex justify-end gap-1">
                     <button
                       on:click={() => {
                         previewReceipt = receipt;
                         showPreview = true;
                       }}
-                      class="p-1 text-blue-600 hover:bg-blue-50 rounded"
+                      class="px-2 py-1 text-xs bg-blue-100 text-blue-700 hover:bg-blue-200 rounded transition-colors"
                       title="Vorschau"
                     >
-                      <Eye size={18} />
+                      <Eye size={14} class="inline mr-1" />
+                      Vorschau
                     </button>
                     <button
                       on:click={() => startEditingReceipt(receipt)}
-                      class="p-1 text-amber-600 hover:bg-amber-50 rounded"
+                      class="px-2 py-1 text-xs bg-amber-100 text-amber-700 hover:bg-amber-200 rounded transition-colors"
                       title="Bearbeiten"
                     >
-                      <Pencil size={18} />
+                      <Pencil size={14} class="inline mr-1" />
+                      Bearbeiten
                     </button>
                     <button
                       on:click={() => reanalyzeReceipt(receipt)}
                       disabled={analyzing}
-                      class="p-1 text-purple-600 hover:bg-purple-50 rounded disabled:opacity-50"
+                      class="px-2 py-1 text-xs bg-purple-100 text-purple-700 hover:bg-purple-200 rounded transition-colors disabled:opacity-50"
                       title="Neu analysieren"
                     >
-                      <ArrowsClockwise size={18} />
+                      <ArrowsClockwise size={14} class="inline mr-1" />
+                      Analysieren
                     </button>
                     {#if receipt.file_url}
                       <a
                         href={receipt.file_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        class="p-1 text-green-600 hover:bg-green-50 rounded"
+                        class="px-2 py-1 text-xs bg-green-100 text-green-700 hover:bg-green-200 rounded transition-colors"
                         title="Download"
                       >
-                        <Download size={18} />
+                        <Download size={14} class="inline mr-1" />
+                        Download
                       </a>
                     {/if}
                     <button
                       on:click={() => deleteReceipt(receipt.id)}
-                      class="p-1 text-red-600 hover:bg-red-50 rounded"
+                      class="px-2 py-1 text-xs bg-red-100 text-red-700 hover:bg-red-200 rounded transition-colors"
                       title="Löschen"
                     >
-                      <Trash size={18} />
+                      <Trash size={14} class="inline mr-1" />
+                      Löschen
                     </button>
                   </div>
                 </td>
