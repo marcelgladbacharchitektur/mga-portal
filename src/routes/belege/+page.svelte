@@ -152,8 +152,12 @@
   }
   
   async function uploadReceipt() {
-    if (!selectedFile || !receiptsFolderId) return;
+    if (!selectedFile) {
+      console.error('No file selected');
+      return;
+    }
     
+    console.log('Starting upload...', selectedFile.name);
     uploading = true;
     try {
       const formData = new FormData();
@@ -166,12 +170,16 @@
         body: formData
       });
       
+      console.log('Upload response status:', response.status);
+      
       if (!response.ok) {
         const errorData = await response.json();
+        console.error('Upload error:', errorData);
         throw new Error(errorData.error || 'Upload failed');
       }
       
       const uploadedFile = await response.json();
+      console.log('Upload successful:', uploadedFile);
       
       // Automatically analyze after upload
       await analyzeReceipt(uploadedFile.id, uploadedFile.name);
@@ -182,6 +190,7 @@
       // Reload drive files
       await loadDriveFiles();
     } catch (err) {
+      console.error('Upload error:', err);
       alert('Fehler beim Upload: ' + (err instanceof Error ? err.message : 'Unknown error'));
     } finally {
       uploading = false;
@@ -235,6 +244,8 @@
   onMount(async () => {
     await checkAuth();
     await loadReceipts();
+    // Set default receipts folder ID
+    receiptsFolderId = DRIVE_FOLDERS.RECEIPTS_INBOX;
     if (activeTab === 'drive') {
       await loadDriveFiles();
     }
