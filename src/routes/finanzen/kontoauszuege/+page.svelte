@@ -14,6 +14,12 @@
   let selectedStatement: any = null;
   let editingStatement: any = null;
   let showStatementDetails = false;
+  
+  // Time filter variables
+  let timeFilter = 'all'; // 'all', 'month', 'quarter', 'year', 'custom'
+  let customStartDate = '';
+  let customEndDate = '';
+  let allBankStatements: any[] = []; // Store all statements
   let editForm = {
     bank_name: '',
     account_number: '',
@@ -28,17 +34,76 @@
       const response = await fetch('/api/bank-statements');
       if (!response.ok) {
         console.error('Failed to load bank statements:', response.status);
+        allBankStatements = [];
         bankStatements = [];
         return;
       }
-      bankStatements = await response.json();
+      allBankStatements = await response.json();
+      applyTimeFilter(); // Apply current filter
     } catch (err) {
       console.error('Error loading bank statements:', err);
       error = err instanceof Error ? err.message : 'Fehler beim Laden';
+      allBankStatements = [];
       bankStatements = [];
     } finally {
       loading = false;
     }
+  }
+  
+  function applyTimeFilter() {
+    if (!allBankStatements.length) {
+      bankStatements = [];
+      return;
+    }
+    
+    const now = new Date();
+    let startDate: Date | null = null;
+    let endDate: Date | null = null;
+    
+    switch (timeFilter) {
+      case 'month':
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        break;
+      case 'quarter':
+        const quarter = Math.floor(now.getMonth() / 3);
+        startDate = new Date(now.getFullYear(), quarter * 3, 1);
+        endDate = new Date(now.getFullYear(), quarter * 3 + 3, 0);
+        break;
+      case 'year':
+        startDate = new Date(now.getFullYear(), 0, 1);
+        endDate = new Date(now.getFullYear(), 11, 31);
+        break;
+      case 'custom':
+        if (customStartDate) startDate = new Date(customStartDate);
+        if (customEndDate) endDate = new Date(customEndDate);
+        break;
+      default: // 'all'
+        bankStatements = allBankStatements;
+        return;
+    }
+    
+    bankStatements = allBankStatements.filter(statement => {
+      if (!statement.start_date && !statement.end_date) return true;
+      
+      const statementStart = statement.start_date ? new Date(statement.start_date) : null;
+      const statementEnd = statement.end_date ? new Date(statement.end_date) : null;
+      
+      if (startDate && statementEnd && statementEnd < startDate) return false;
+      if (endDate && statementStart && statementStart > endDate) return false;
+      
+      return true;
+    });
+  }
+  
+  // Reactive statement to apply filter when timeFilter changes
+  $: if (timeFilter !== 'custom') {
+    applyTimeFilter();
+  }
+  
+  // Reactive statement for custom date range
+  $: if (timeFilter === 'custom' && (customStartDate || customEndDate)) {
+    applyTimeFilter();
   }
   
   async function handleFileSelect(event: Event) {
@@ -278,8 +343,9 @@
     </div>
   {/if}
   
-  <!-- Search -->
-  <div class="mb-6">
+  <!-- Search and Filters -->
+  <div class="mb-6 space-y-4">
+    <!-- Search -->
     <div class="relative">
       <MagnifyingGlass size={20} class="absolute left-3 top-1/2 -translate-y-1/2 text-ink/40" />
       <input
@@ -288,6 +354,80 @@
         placeholder="Transaktionen durchsuchen..."
         class="w-full pl-10 pr-4 py-2 border border-ink/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-green/50"
       />
+    </div>
+    
+    <!-- Time Filter -->
+    <div class="bg-white rounded-lg shadow-sm border border-ink/10 p-4">
+      <div class="flex flex-wrap items-center gap-4">
+        <div class="flex items-center gap-2">
+          <Calendar size={20} class="text-ink/60" />
+          <span class="text-sm font-medium text-ink">Zeitraum:</span>
+        </div>
+        
+        <div class="flex flex-wrap gap-2">
+          <label class="flex items-center">
+            <input type="radio" bind:group={timeFilter} value="all" class="mr-2" />
+            <span class="text-sm">Alle</span>
+          </label>
+          <label class="flex items-center">
+            <input type="radio" bind:group={timeFilter} value="month" class="mr-2" />
+            <span class="text-sm">Aktueller Monat</span>
+          </label>
+          <label class="flex items-center">
+            <input type="radio" bind:group={timeFilter} value="quarter" class="mr-2" />
+            <span class="text-sm">Aktuelles Quartal</span>
+          </label>
+          <label class="flex items-center">
+            <input type="radio" bind:group={timeFilter} value="year" class="mr-2" />
+            <span class="text-sm">Aktuelles Jahr</span>
+          </label>
+          <label class="flex items-center">
+            <input type="radio" bind:group={timeFilter} value="custom" class="mr-2" />
+            <span class="text-sm">Benutzerdefiniert</span>
+          </label>
+        </div>
+        
+        {#if timeFilter === 'custom'}
+          <div class="flex items-center gap-2 ml-4">
+            <input
+              type="date"
+              bind:value={customStartDate}
+              class="px-2 py-1 border border-ink/20 rounded text-sm"
+              placeholder="Von"
+            />
+            <span class="text-ink/60">bis</span>
+            <input
+              type="date"
+              bind:value={customEndDate}
+              class="px-2 py-1 border border-ink/20 rounded text-sm"
+              placeholder="Bis"
+            />
+          </div>
+        {/if}
+      </div>
+      
+      <!-- Filter Summary -->
+      {#if timeFilter !== 'all'}
+        <div class="mt-2 text-xs text-ink/60">
+          {#if timeFilter === 'month'}
+            Zeige Kontoauszüge vom aktuellen Monat
+          {:else if timeFilter === 'quarter'}
+            Zeige Kontoauszüge vom aktuellen Quartal
+          {:else if timeFilter === 'year'}
+            Zeige Kontoauszüge vom aktuellen Jahr
+          {:else if timeFilter === 'custom'}
+            {#if customStartDate || customEndDate}
+              Zeige Kontoauszüge 
+              {#if customStartDate}vom {formatDate(customStartDate)}{/if}
+              {#if customStartDate && customEndDate} bis {/if}
+              {#if customEndDate}zum {formatDate(customEndDate)}{/if}
+            {:else}
+              Bitte Zeitraum auswählen
+            {/if}
+          {/if}
+          • {bankStatements.length} von {allBankStatements.length} Auszügen angezeigt
+        </div>
+      {/if}
     </div>
   </div>
   
