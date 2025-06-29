@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { getSupabaseClient } from './supabase';
 
 const SETTINGS_KEY = 'app_settings';
 
@@ -30,6 +30,7 @@ export async function getSettings(): Promise<AppSettings> {
   };
 
   try {
+    const supabase = getSupabaseClient();
     const { data, error } = await supabase
       .from('settings')
       .select('value')
@@ -54,6 +55,7 @@ export async function getSettings(): Promise<AppSettings> {
 }
 
 export async function updateSettings(settings: AppSettings): Promise<void> {
+  const supabase = getSupabaseClient();
   const { error } = await supabase
     .from('settings')
     .upsert({
