@@ -16,7 +16,13 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
     const refreshToken = cookies.get('google_refresh_token') || process.env.GOOGLE_REFRESH_TOKEN;
     
     if (!accessToken) {
-      return json({ error: 'Not authenticated with Google' }, { status: 401 });
+      // Return empty response if not authenticated
+      return json({ 
+        id: folderId,
+        name: 'Nicht verbunden',
+        url: null,
+        authenticated: false
+      });
     }
     
     // Initialize Google Drive

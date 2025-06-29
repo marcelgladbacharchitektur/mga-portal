@@ -14,8 +14,8 @@
     { href: '/projekte', label: 'Projekte', icon: FolderOpen },
     { href: '/zeiterfassung', label: 'Zeit', icon: Clock },
     { href: '/finanzen', label: 'Finanzen', icon: CurrencyCircleDollar },
-    { href: '/aufgaben', label: 'Aufgaben', icon: CheckSquare },
     { href: '/kontakte', label: 'Kontakte', icon: Users },
+    { href: '/aufgaben', label: 'Aufgaben', icon: CheckSquare },
     { href: '/einstellungen', label: 'Einstellungen', icon: Gear },
   ];
   

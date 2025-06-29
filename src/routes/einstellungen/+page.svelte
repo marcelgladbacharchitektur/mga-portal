@@ -60,7 +60,13 @@
         body: JSON.stringify(settings)
       });
       
-      if (!response.ok) throw new Error('Failed to save settings');
+      if (!response.ok) {
+        const data = await response.json();
+        if (data.requiresMigration) {
+          throw new Error('Die Datenbank-Tabellen müssen erst erstellt werden. Bitte wenden Sie sich an den Administrator.');
+        }
+        throw new Error('Failed to save settings');
+      }
       
       savedFields.add(fieldName);
       setTimeout(() => savedFields.delete(fieldName), 3000);

@@ -13,9 +13,13 @@ export const GET: RequestHandler = async () => {
       .eq('key', SETTINGS_KEY)
       .single();
 
-    if (error && error.code !== 'PGRST116') { // PGRST116 = no rows found
-      console.error('Error loading settings:', error);
-      return json({ error: error.message }, { status: 500 });
+    if (error) {
+      // If table doesn't exist or no rows found, return defaults
+      if (error.code === 'PGRST116' || error.message.includes('relation "settings" does not exist')) {
+        console.log('Settings table not found or empty, returning defaults');
+      } else {
+        console.error('Error loading settings:', error);
+      }
     }
 
     // Return settings or default values
@@ -38,6 +42,25 @@ export const GET: RequestHandler = async () => {
 export const POST: RequestHandler = async ({ request }) => {
   try {
     const settings = await request.json();
+
+    // First, try to create the table if it doesn't exist
+    try {
+      // Check if table exists by trying to select from it
+      const { error: checkError } = await supabase
+        .from('settings')
+        .select('id')
+        .limit(1);
+      
+      if (checkError && checkError.message.includes('relation "settings" does not exist')) {
+        console.log('Settings table does not exist yet');
+        return json({ 
+          error: 'Settings table not created yet. Please run database migrations.',
+          requiresMigration: true 
+        }, { status: 503 });
+      }
+    } catch (e) {
+      console.error('Error checking table:', e);
+    }
 
     // Upsert settings
     const { error } = await supabase
