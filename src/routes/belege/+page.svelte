@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { Receipt, Upload, Camera, MagnifyingGlass, Download, Eye, Trash, FolderOpen, X, Sparkle, Calendar, Folder, CaretRight } from 'phosphor-svelte';
+  import { Receipt, Upload, Camera, MagnifyingGlass, Download, Eye, Trash, FolderOpen, X, Sparkle, Calendar, Folder, CaretRight, ArrowRight } from 'phosphor-svelte';
   import type { Receipt as ReceiptType } from '$lib/server/supabase';
   import { DRIVE_FOLDERS } from '$lib/config/drive-folders';
   
@@ -20,6 +20,9 @@
   let previewReceipt: ReceiptType | null = null;
   let activeTab: 'table' | 'drive' = 'table';
   let isAuthenticated = false;
+  let showMoveDialog = false;
+  let fileToMove: any = null;
+  let selectedTargetFolder = '';
   
   async function checkAuth() {
     try {
@@ -93,6 +96,39 @@
     await loadDriveFiles(folder.id);
   }
   
+  async function moveFile() {
+    if (!fileToMove || !selectedTargetFolder) return;
+    
+    try {
+      const response = await fetch('/api/receipts/move', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fileId: fileToMove.id,
+          targetFolderId: selectedTargetFolder,
+          currentFolderId: currentFolderId
+        })
+      });
+      
+      if (!response.ok) throw new Error('Failed to move file');
+      
+      // Save filename before clearing
+      const fileName = fileToMove.name;
+      
+      // Close dialog
+      showMoveDialog = false;
+      fileToMove = null;
+      selectedTargetFolder = '';
+      
+      // Refresh current folder
+      await loadDriveFiles(currentFolderId);
+      
+      alert(`Datei "${fileName}" wurde erfolgreich verschoben!`);
+    } catch (err) {
+      alert('Fehler beim Verschieben: ' + (err instanceof Error ? err.message : 'Unknown error'));
+    }
+  }
+  
   async function analyzeReceipt(fileId: string, filename: string) {
     analyzing = true;
     try {
@@ -122,7 +158,8 @@
     try {
       const formData = new FormData();
       formData.append('file', selectedFile);
-      formData.append('folderId', currentFolderId || receiptsFolderId);
+      // Always upload to inbox folder, not current folder
+      formData.append('folderId', DRIVE_FOLDERS.RECEIPTS_INBOX);
       
       const response = await fetch('/api/receipts/upload', {
         method: 'POST',
@@ -360,6 +397,10 @@
           Beleg hochladen
         </h3>
         
+        <p class="text-sm text-ink/60 mb-4">
+          Neue Belege werden automatisch in den Eingangsordner hochgeladen und können später sortiert werden.
+        </p>
+        
         <div class="space-y-4">
           <div>
             <label class="block text-sm font-medium text-ink mb-2">
@@ -465,18 +506,32 @@
                   </div>
                 </div>
                 
-                <button
-                  on:click={() => analyzeReceipt(file.id, file.name)}
-                  disabled={analyzing}
-                  class="px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-ink/30 flex items-center gap-2 text-sm"
-                >
-                  {#if analyzing}
-                    <div class="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
-                  {:else}
-                    <Sparkle size={16} />
-                  {/if}
-                  Analysieren
-                </button>
+                <div class="flex items-center gap-2">
+                  <button
+                    on:click={() => {
+                      fileToMove = file;
+                      showMoveDialog = true;
+                    }}
+                    class="px-3 py-1 bg-ink/10 text-ink rounded-lg hover:bg-ink/20 flex items-center gap-2 text-sm"
+                    title="In anderen Ordner verschieben"
+                  >
+                    <ArrowRight size={16} />
+                    Verschieben
+                  </button>
+                  
+                  <button
+                    on:click={() => analyzeReceipt(file.id, file.name)}
+                    disabled={analyzing}
+                    class="px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-ink/30 flex items-center gap-2 text-sm"
+                  >
+                    {#if analyzing}
+                      <div class="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                    {:else}
+                      <Sparkle size={16} />
+                    {/if}
+                    Analysieren
+                  </button>
+                </div>
               </div>
             {/each}
           </div>
@@ -558,6 +613,65 @@
             </div>
           </div>
         {/if}
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- Move File Dialog -->
+{#if showMoveDialog && fileToMove}
+  <div class="fixed inset-0 bg-ink/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-lg max-w-md w-full p-6 shadow-xl">
+      <h2 class="text-xl font-bold mb-4">Datei verschieben</h2>
+      
+      <p class="text-sm text-ink/60 mb-4">
+        Verschiebe "{fileToMove.name}" in einen anderen Ordner:
+      </p>
+      
+      <div class="space-y-2 mb-6 max-h-60 overflow-y-auto">
+        <button
+          on:click={() => selectedTargetFolder = DRIVE_FOLDERS.RECEIPTS_INBOX}
+          class={`w-full flex items-center gap-3 p-3 border rounded-lg transition-colors text-left ${
+            selectedTargetFolder === DRIVE_FOLDERS.RECEIPTS_INBOX
+              ? 'border-accent-green bg-accent-green/10'
+              : 'border-ink/10 hover:bg-ink/5'
+          }`}
+        >
+          <Folder size={20} class="text-amber-600" />
+          <span>Belege (Eingang)</span>
+        </button>
+        
+        <button
+          on:click={() => selectedTargetFolder = DRIVE_FOLDERS.RECEIPTS_ARCHIVE}
+          class={`w-full flex items-center gap-3 p-3 border rounded-lg transition-colors text-left ${
+            selectedTargetFolder === DRIVE_FOLDERS.RECEIPTS_ARCHIVE
+              ? 'border-accent-green bg-accent-green/10'
+              : 'border-ink/10 hover:bg-ink/5'
+          }`}
+        >
+          <Folder size={20} class="text-amber-600" />
+          <span>Belege (Archiv)</span>
+        </button>
+      </div>
+      
+      <div class="flex justify-end gap-3">
+        <button
+          on:click={() => {
+            showMoveDialog = false;
+            fileToMove = null;
+            selectedTargetFolder = '';
+          }}
+          class="px-4 py-2 text-ink bg-ink/10 rounded-md hover:bg-ink/20"
+        >
+          Abbrechen
+        </button>
+        <button
+          on:click={moveFile}
+          disabled={!selectedTargetFolder}
+          class="px-4 py-2 bg-accent-green text-white rounded-md hover:bg-accent-green/90 disabled:bg-ink/30"
+        >
+          Verschieben
+        </button>
       </div>
     </div>
   </div>
