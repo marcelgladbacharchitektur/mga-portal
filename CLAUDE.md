@@ -65,6 +65,7 @@ GOOGLE_REDIRECT_URI
 GOOGLE_ACCESS_TOKEN
 GOOGLE_REFRESH_TOKEN
 API_TOKEN
+PUBLIC_APP_URL (optional, for production deployment)
 ```
 
 ## Commands
@@ -111,8 +112,11 @@ npm run check      # Run svelte-check
 2. Create new project or select existing
 3. Enable APIs: Drive API, Calendar API, Tasks API
 4. Create OAuth 2.0 Client ID
-5. Add redirect URI: `http://localhost:5173/auth/callback`
+5. Add redirect URIs:
+   - `http://localhost:5173/auth/callback` (for local development)
+   - `https://yourdomain.com/auth/callback` (for production)
 6. Update .env with Client ID and Secret
+7. For production: Set `PUBLIC_APP_URL=https://yourdomain.com` in .env
 
 ### Required OAuth Scopes
 - `https://www.googleapis.com/auth/drive` - Full Drive access

@@ -26,12 +26,14 @@ export const GET: RequestHandler = async ({ cookies }) => {
     const drive = google.drive({ version: 'v3', auth });
     let driveAccess = false;
     let driveError = null;
+    let driveUser = null;
     
     try {
-      await drive.about.get({
-        fields: 'user'
+      const aboutResponse = await drive.about.get({
+        fields: 'user(displayName, emailAddress, photoLink)'
       });
       driveAccess = true;
+      driveUser = aboutResponse.data.user;
     } catch (error: any) {
       driveError = {
         code: error.code,
@@ -48,6 +50,7 @@ export const GET: RequestHandler = async ({ cookies }) => {
       },
       driveAccess,
       driveError,
+      driveUser,
       scopes: tokenInfo.data.scope?.split(' ') || []
     });
   } catch (error: any) {

@@ -65,10 +65,12 @@
           return;
         }
         if (response.status === 403) {
+          error = errorData.error;
+          if (errorData.helpText) {
+            error += '\n\n' + errorData.helpText;
+          }
           if (errorData.needsReauth) {
-            error = errorData.error + '\n\nBitte melden Sie sich erneut mit Google an, um die erforderlichen Berechtigungen zu erteilen.';
-          } else {
-            error = errorData.error + '\n\nDetails: ' + (errorData.details || 'Keine weiteren Details verfügbar');
+            error += '\n\nBitte melden Sie sich erneut mit Google an, um die erforderlichen Berechtigungen zu erteilen.';
           }
           return;
         }
@@ -80,7 +82,9 @@
       }
       
       const data = await response.json();
-      files = data.files;
+      console.log('Frontend received:', data);
+      console.log('Number of files:', data.files?.length);
+      files = data.files || [];
       
       if (folderId && folderId !== currentFolderId) {
         if (folderId === 'root') {
@@ -143,8 +147,13 @@
     if (file.mimeType === 'application/vnd.google-apps.folder') {
       navigateToFolder(file.id);
     } else {
-      selectedFile = file;
-      showPreview = true;
+      // For Google Docs/Sheets/etc, open in new tab instead of preview
+      if (file.mimeType.startsWith('application/vnd.google-apps.')) {
+        window.open(file.webViewLink, '_blank');
+      } else {
+        selectedFile = file;
+        showPreview = true;
+      }
     }
   }
   
@@ -219,14 +228,24 @@
   {:else if error}
     <div class="bg-red-100/50 border border-red-400/50 text-red-700 px-4 py-3 rounded">
       <p class="font-medium whitespace-pre-line">{error}</p>
-      {#if error.includes('Google') || error.includes('Berechtigungen')}
-        <a 
-          href="/api/auth/google?action=login" 
-          class="inline-block mt-3 px-4 py-2 bg-accent-green text-white rounded-lg hover:bg-accent-green/90 transition-colors"
-        >
-          Erneut mit Google anmelden
-        </a>
-      {/if}
+      <div class="flex gap-3 mt-3">
+        {#if error.includes('Google') || error.includes('Berechtigungen')}
+          <a 
+            href="/api/auth/google?action=login" 
+            class="inline-block px-4 py-2 bg-accent-green text-white rounded-lg hover:bg-accent-green/90 transition-colors"
+          >
+            Erneut mit Google anmelden
+          </a>
+        {/if}
+        {#if error.includes('Zugriff') || error.includes('geteilt')}
+          <a 
+            href="/projekte/{projectId}" 
+            class="inline-block px-4 py-2 bg-ink/10 text-ink rounded-lg hover:bg-ink/20 transition-colors"
+          >
+            Drive-Ordner ändern
+          </a>
+        {/if}
+      </div>
     </div>
   {:else if files.length === 0}
     <div class="text-center py-12">
@@ -245,6 +264,10 @@
               src={file.thumbnailLink} 
               alt={file.name}
               class="w-20 h-20 object-cover rounded mb-2"
+              on:error={(e) => {
+                console.error('Thumbnail load error for:', file.name);
+                e.target.style.display = 'none';
+              }}
             />
           {:else}
             <svelte:component 
@@ -327,46 +350,64 @@
     <div class="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
       <div class="flex items-center justify-between p-4 border-b border-ink/10">
         <h3 class="font-semibold truncate">{selectedFile.name}</h3>
-        <button
-          on:click={() => showPreview = false}
-          class="p-2 rounded-lg hover:bg-ink/5"
-        >
-          <X size={20} />
-        </button>
+        <div class="flex items-center gap-2">
+          {#if selectedFile.webViewLink}
+            <a
+              href={selectedFile.webViewLink}
+              target="_blank"
+              class="p-2 rounded-lg hover:bg-ink/5 text-ink/60 hover:text-accent-green"
+              title="In Google Drive öffnen"
+            >
+              <Eye size={20} />
+            </a>
+          {/if}
+          <button
+            on:click={() => showPreview = false}
+            class="p-2 rounded-lg hover:bg-ink/5"
+          >
+            <X size={20} />
+          </button>
+        </div>
       </div>
       
       <div class="flex-1 overflow-auto p-4">
-        {#if selectedFile.mimeType.startsWith('image/') && selectedFile.webContentLink}
-          <img 
-            src={selectedFile.webContentLink} 
-            alt={selectedFile.name}
-            class="max-w-full mx-auto"
+        <div class="text-center py-12">
+          <svelte:component 
+            this={getFileIcon(selectedFile)} 
+            size={64} 
+            class="mx-auto text-ink/40 mb-4"
           />
-        {:else if selectedFile.webViewLink}
-          <iframe
-            src={selectedFile.webViewLink}
-            class="w-full h-[70vh]"
-            title={selectedFile.name}
-          />
-        {:else}
-          <div class="text-center py-12">
-            <svelte:component 
-              this={getFileIcon(selectedFile)} 
-              size={64} 
-              class="mx-auto text-ink/40 mb-4"
-            />
-            <p class="text-ink/60 mb-4">Vorschau nicht verfügbar</p>
+          <p class="text-lg font-medium mb-2">{selectedFile.name}</p>
+          <p class="text-sm text-ink/60 mb-6">
+            {#if selectedFile.mimeType.startsWith('application/vnd.google-apps.')}
+              Google Drive Datei - Klicken Sie auf "In Drive öffnen" um die Datei anzuzeigen
+            {:else}
+              Vorschau in der App nicht verfügbar
+            {/if}
+          </p>
+          <div class="flex items-center justify-center gap-3">
+            {#if selectedFile.webViewLink}
+              <a
+                href={selectedFile.webViewLink}
+                target="_blank"
+                class="inline-flex items-center gap-2 px-4 py-2 bg-accent-green text-white rounded-lg hover:bg-accent-green/90"
+              >
+                <Eye size={20} />
+                In Google Drive öffnen
+              </a>
+            {/if}
             {#if selectedFile.webContentLink}
               <a
                 href={selectedFile.webContentLink}
-                class="inline-flex items-center gap-2 px-4 py-2 bg-accent-green text-white rounded-lg hover:bg-accent-green/90"
+                download
+                class="inline-flex items-center gap-2 px-4 py-2 bg-ink/10 text-ink rounded-lg hover:bg-ink/20"
               >
                 <Download size={20} />
                 Herunterladen
               </a>
             {/if}
           </div>
-        {/if}
+        </div>
       </div>
     </div>
   </div>

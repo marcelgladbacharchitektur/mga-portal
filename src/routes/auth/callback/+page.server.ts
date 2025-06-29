@@ -2,12 +2,7 @@ import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { google } from 'googleapis';
 import { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI } from '$env/static/private';
-
-const oauth2Client = new google.auth.OAuth2(
-  GOOGLE_CLIENT_ID,
-  GOOGLE_CLIENT_SECRET,
-  GOOGLE_REDIRECT_URI
-);
+import { PUBLIC_APP_URL } from '$env/static/public';
 
 export const load: PageServerLoad = async ({ url, cookies }) => {
   const code = url.searchParams.get('code');
@@ -23,11 +18,27 @@ export const load: PageServerLoad = async ({ url, cookies }) => {
   }
   
   try {
+    // Determine redirect URI dynamically (same logic as in auth endpoint)
+    let redirectUri = GOOGLE_REDIRECT_URI;
+    if (PUBLIC_APP_URL) {
+      redirectUri = `${PUBLIC_APP_URL}/auth/callback`;
+    } else {
+      const protocol = url.protocol;
+      const host = url.host;
+      redirectUri = `${protocol}//${host}/auth/callback`;
+    }
+    
     console.log('OAuth2 Client Config:', {
       clientId: GOOGLE_CLIENT_ID,
       clientSecret: GOOGLE_CLIENT_SECRET ? 'SET' : 'MISSING',
-      redirectUri: GOOGLE_REDIRECT_URI
+      redirectUri: redirectUri
     });
+    
+    const oauth2Client = new google.auth.OAuth2(
+      GOOGLE_CLIENT_ID,
+      GOOGLE_CLIENT_SECRET,
+      redirectUri
+    );
     
     const { tokens } = await oauth2Client.getToken(code);
     

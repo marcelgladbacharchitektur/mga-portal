@@ -41,6 +41,13 @@
         <div>
           <h2 class="font-semibold mb-2">Google Drive Zugriff</h2>
           <p>Status: {debugInfo.driveAccess ? '✅ Zugriff möglich' : '❌ Kein Zugriff'}</p>
+          {#if debugInfo.driveUser}
+            <div class="mt-2 p-3 bg-green-50 rounded">
+              <p class="font-semibold">Drive Account:</p>
+              <p>Name: {debugInfo.driveUser.displayName}</p>
+              <p>Email: {debugInfo.driveUser.emailAddress}</p>
+            </div>
+          {/if}
           {#if debugInfo.driveError}
             <p class="text-red-600">Fehler: {debugInfo.driveError.code} - {debugInfo.driveError.message}</p>
           {/if}

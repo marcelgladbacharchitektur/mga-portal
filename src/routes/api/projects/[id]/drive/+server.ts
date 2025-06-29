@@ -10,6 +10,8 @@ export const GET: RequestHandler = async ({ params, url, cookies }) => {
     const folderId = url.searchParams.get('folderId');
     const search = url.searchParams.get('search');
     
+    console.log('API called with project ID:', id, 'folderId:', folderId);
+    
     // Get Google auth tokens
     const accessToken = cookies.get('google_access_token');
     const refreshToken = cookies.get('google_refresh_token');
@@ -31,52 +33,50 @@ export const GET: RequestHandler = async ({ params, url, cookies }) => {
     }
     
     // Extract folder ID from URL
-    const projectFolderId = project.drive_folder_url.split('/').pop();
+    // Handle different Google Drive URL formats:
+    // - https://drive.google.com/drive/folders/FOLDER_ID
+    // - https://drive.google.com/drive/u/0/folders/FOLDER_ID
+    // - https://drive.google.com/drive/folders/FOLDER_ID?usp=sharing
+    let projectFolderId = '';
+    const urlMatch = project.drive_folder_url.match(/folders\/([a-zA-Z0-9-_]+)/);
+    if (urlMatch) {
+      projectFolderId = urlMatch[1];
+    } else {
+      // Fallback to old method
+      projectFolderId = project.drive_folder_url.split('/').pop()?.split('?')[0] || '';
+    }
+    
+    console.log('Drive URL:', project.drive_folder_url);
+    console.log('Extracted folder ID:', projectFolderId);
     
     // Initialize Google Drive
     const auth = initializeGoogleAuth(accessToken, refreshToken);
     const drive = google.drive({ version: 'v3', auth });
     
-    // First, check if we have access to the folder
-    try {
-      const folderToCheck = folderId || projectFolderId;
-      console.log('Checking access to folder:', folderToCheck);
-      
-      // Try to get folder metadata first
-      const folderInfo = await drive.files.get({
-        fileId: folderToCheck,
-        fields: 'id, name, mimeType, permissions'
-      });
-      
-      console.log('Folder info:', folderInfo.data);
-    } catch (folderError: any) {
-      console.error('Folder access check failed:', folderError);
-      if (folderError.code === 404) {
-        return json({ error: 'Ordner nicht gefunden' }, { status: 404 });
-      } else if (folderError.code === 403) {
-        return json({ 
-          error: 'Sie haben keinen Zugriff auf diesen Ordner. Bitte stellen Sie sicher, dass der Ordner mit Ihrem Google-Account geteilt wurde.',
-          details: folderError.message 
-        }, { status: 403 });
-      }
-    }
+    // Skip the access check for now - it seems to be causing issues
+    // The list operation will fail anyway if we don't have access
+    const folderToUse = folderId || projectFolderId;
+    console.log('Using folder ID:', folderToUse);
     
     // Build query
-    let query = `'${folderId || projectFolderId}' in parents and trashed = false`;
+    let query = `'${folderToUse}' in parents and trashed = false`;
     if (search) {
       query += ` and name contains '${search}'`;
     }
     
+    console.log('Query:', query);
+    
     // List files
     const response = await drive.files.list({
       q: query,
-      fields: 'files(id, name, mimeType, size, modifiedTime, webViewLink, webContentLink, thumbnailLink, iconLink, parents)',
+      fields: 'files(id, name, mimeType, size, modifiedTime, webViewLink, webContentLink, thumbnailLink, iconLink, parents, capabilities, permissions)',
       orderBy: 'folder,name',
       pageSize: 100,
       supportsAllDrives: true,
       includeItemsFromAllDrives: true
     });
     
+    console.log('Files found:', response.data.files?.length || 0);
     return json({ files: response.data.files || [] });
   } catch (error: any) {
     console.error('Error fetching Drive files:', error);
@@ -85,7 +85,8 @@ export const GET: RequestHandler = async ({ params, url, cookies }) => {
       code: error.code,
       status: error.status,
       errors: error.errors,
-      response: error.response?.data
+      response: error.response?.data,
+      stack: error.stack
     });
     
     if (error.code === 401) {
