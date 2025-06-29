@@ -6,20 +6,37 @@ import { Readable } from 'stream';
 
 export const POST: RequestHandler = async ({ request, cookies }) => {
   try {
+    console.log('Receipt upload request received');
+    
     const formData = await request.formData();
     const file = formData.get('file') as File;
     const folderId = formData.get('folderId') as string;
+    
+    console.log('File:', file?.name, 'Size:', file?.size, 'Type:', file?.type);
+    console.log('Folder ID:', folderId);
     
     if (!file || !folderId) {
       return json({ error: 'File and folder ID required' }, { status: 400 });
     }
     
-    // Get Google auth tokens
-    const accessToken = cookies.get('google_access_token');
-    const refreshToken = cookies.get('google_refresh_token');
+    // Get Google auth tokens from cookies or environment
+    let accessToken = cookies.get('google_access_token');
+    let refreshToken = cookies.get('google_refresh_token');
+    
+    // Fallback to environment variables if not in cookies
+    if (!accessToken) {
+      accessToken = process.env.GOOGLE_ACCESS_TOKEN;
+      refreshToken = process.env.GOOGLE_REFRESH_TOKEN;
+    }
+    
+    console.log('Auth tokens:', { 
+      hasAccessToken: !!accessToken, 
+      hasRefreshToken: !!refreshToken,
+      fromCookies: !!cookies.get('google_access_token')
+    });
     
     if (!accessToken) {
-      return json({ error: 'Not authenticated with Google' }, { status: 401 });
+      return json({ error: 'Not authenticated with Google. Please login first.' }, { status: 401 });
     }
     
     // Initialize Google Drive

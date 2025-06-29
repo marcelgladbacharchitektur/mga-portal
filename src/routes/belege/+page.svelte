@@ -1,11 +1,12 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { Receipt, Upload, Camera, MagnifyingGlass, Download, Eye, Trash, FolderOpen, X, Sparkle, Calendar } from 'phosphor-svelte';
+  import { Receipt, Upload, Camera, MagnifyingGlass, Download, Eye, Trash, FolderOpen, X, Sparkle, Calendar, Folder, CaretRight } from 'phosphor-svelte';
   import type { Receipt as ReceiptType } from '$lib/server/supabase';
   import { DRIVE_FOLDERS } from '$lib/config/drive-folders';
   
   let receipts: ReceiptType[] = [];
   let driveFiles: any[] = [];
+  let driveFolders: any[] = [];
   let loading = true;
   let error = '';
   let uploading = false;
@@ -13,9 +14,24 @@
   let searchQuery = '';
   let selectedFile: File | null = null;
   let receiptsFolderId = '';
+  let currentFolderId = '';
+  let folderPath: { id: string; name: string }[] = [];
   let showPreview = false;
   let previewReceipt: ReceiptType | null = null;
   let activeTab: 'table' | 'drive' = 'table';
+  let isAuthenticated = false;
+  
+  async function checkAuth() {
+    try {
+      const response = await fetch('/api/auth/google/status');
+      if (response.ok) {
+        const data = await response.json();
+        isAuthenticated = data.authenticated;
+      }
+    } catch (err) {
+      console.error('Auth check failed:', err);
+    }
+  }
   
   async function loadReceipts() {
     loading = true;
@@ -33,16 +49,23 @@
     }
   }
   
-  async function loadDriveFiles() {
+  async function loadDriveFiles(folderId?: string) {
     try {
-      // Use the specific incoming receipts folder
-      receiptsFolderId = DRIVE_FOLDERS.RECEIPTS_INBOX;
+      // Use provided folder ID or default to receipts inbox
+      const targetFolderId = folderId || DRIVE_FOLDERS.RECEIPTS_INBOX;
       
-      // Load files from the incoming receipts folder
-      const response = await fetch(`/api/receipts?folderId=${receiptsFolderId}`);
+      if (!folderId) {
+        receiptsFolderId = DRIVE_FOLDERS.RECEIPTS_INBOX;
+        currentFolderId = DRIVE_FOLDERS.RECEIPTS_INBOX;
+        folderPath = [{ id: DRIVE_FOLDERS.RECEIPTS_INBOX, name: 'Belege' }];
+      }
+      
+      // Load both files and folders
+      const response = await fetch(`/api/receipts/folder?folderId=${targetFolderId}`);
       if (!response.ok) {
         if (response.status === 401) {
           error = 'Nicht mit Google Drive verbunden';
+          isAuthenticated = false;
           return;
         }
         throw new Error('Failed to load drive files');
@@ -50,10 +73,24 @@
       
       const data = await response.json();
       driveFiles = data.files || [];
+      driveFolders = data.folders || [];
+      currentFolderId = targetFolderId;
     } catch (err) {
       console.error('Error loading drive files:', err);
       error = 'Fehler beim Laden der Drive-Dateien';
     }
+  }
+  
+  async function navigateToFolder(folder: { id: string; name: string }) {
+    const index = folderPath.findIndex(f => f.id === folder.id);
+    if (index >= 0) {
+      // Navigate back
+      folderPath = folderPath.slice(0, index + 1);
+    } else {
+      // Navigate forward
+      folderPath = [...folderPath, folder];
+    }
+    await loadDriveFiles(folder.id);
   }
   
   async function analyzeReceipt(fileId: string, filename: string) {
@@ -85,34 +122,40 @@
     try {
       const formData = new FormData();
       formData.append('file', selectedFile);
-      formData.append('folderId', receiptsFolderId);
+      formData.append('folderId', currentFolderId || receiptsFolderId);
       
       const response = await fetch('/api/receipts/upload', {
         method: 'POST',
         body: formData
       });
       
-      if (!response.ok) throw new Error('Upload failed');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Upload failed');
+      }
       
       const uploadedFile = await response.json();
       
       // Automatically analyze after upload
       await analyzeReceipt(uploadedFile.id, uploadedFile.name);
       
+      // Clear selected file
       selectedFile = null;
+      
+      // Reload drive files
       await loadDriveFiles();
     } catch (err) {
-      alert('Upload fehlgeschlagen: ' + (err instanceof Error ? err.message : 'Unknown error'));
+      alert('Fehler beim Upload: ' + (err instanceof Error ? err.message : 'Unknown error'));
     } finally {
       uploading = false;
     }
   }
   
-  async function deleteReceipt(id: string) {
+  async function deleteReceipt(receiptId: string) {
     if (!confirm('Möchten Sie diesen Beleg wirklich löschen?')) return;
     
     try {
-      const response = await fetch(`/api/receipts/${id}`, {
+      const response = await fetch(`/api/receipts/${receiptId}`, {
         method: 'DELETE'
       });
       
@@ -124,77 +167,111 @@
     }
   }
   
-  function formatDate(dateString?: string) {
-    if (!dateString) return '-';
-    return new Date(dateString).toLocaleDateString('de-AT');
+  function handleFileSelect(event: Event) {
+    const input = event.target as HTMLInputElement;
+    if (input.files && input.files[0]) {
+      selectedFile = input.files[0];
+    }
   }
   
-  function formatCurrency(amount: number, currency = 'EUR') {
+  function formatCurrency(amount: number, currency: string = 'EUR') {
     return new Intl.NumberFormat('de-AT', {
       style: 'currency',
       currency: currency
     }).format(amount);
   }
   
+  function formatDate(dateString: string) {
+    return new Date(dateString).toLocaleDateString('de-AT');
+  }
+  
   $: filteredReceipts = receipts.filter(receipt => {
     if (!searchQuery) return true;
-    const query = searchQuery.toLowerCase();
+    const search = searchQuery.toLowerCase();
     return (
-      receipt.vendor.toLowerCase().includes(query) ||
-      receipt.invoice_number?.toLowerCase().includes(query) ||
-      receipt.category?.toLowerCase().includes(query)
+      receipt.vendor_name?.toLowerCase().includes(search) ||
+      receipt.invoice_number?.toLowerCase().includes(search) ||
+      receipt.description?.toLowerCase().includes(search)
     );
   });
   
-  onMount(() => {
-    loadReceipts();
-    loadDriveFiles();
+  onMount(async () => {
+    await checkAuth();
+    await loadReceipts();
+    if (activeTab === 'drive') {
+      await loadDriveFiles();
+    }
   });
+  
+  $: if (activeTab === 'drive' && receipts.length > 0) {
+    loadDriveFiles();
+  }
 </script>
 
 <div class="container mx-auto p-4">
-  <div class="mb-6">
-    <h1 class="text-3xl font-bold mb-4">Belege</h1>
+  <div class="flex items-center justify-between mb-6">
+    <h1 class="text-3xl font-bold flex items-center gap-3">
+      <Receipt size={32} />
+      Belege
+    </h1>
     
-    <!-- Tabs -->
-    <div class="flex gap-1 bg-ink/5 rounded-lg p-1 mb-4 max-w-xs">
-      <button
-        on:click={() => activeTab = 'table'}
-        class="flex-1 px-4 py-2 rounded {activeTab === 'table' ? 'bg-white shadow-sm' : 'hover:bg-ink/5'} transition-all"
+    {#if !isAuthenticated}
+      <a 
+        href="/api/auth/google?action=login"
+        class="px-4 py-2 bg-accent-green text-white rounded-lg hover:bg-accent-green/90"
       >
-        Tabelle
-      </button>
-      <button
-        on:click={() => activeTab = 'drive'}
-        class="flex-1 px-4 py-2 rounded {activeTab === 'drive' ? 'bg-white shadow-sm' : 'hover:bg-ink/5'} transition-all"
-      >
-        Drive Upload
-      </button>
-    </div>
-    
-    <!-- Search -->
-    <div class="relative max-w-md">
-      <MagnifyingGlass size={20} class="absolute left-3 top-1/2 -translate-y-1/2 text-ink/40" />
-      <input
-        type="search"
-        bind:value={searchQuery}
-        placeholder="Suche nach Händler, Nummer, Kategorie..."
-        class="w-full pl-10 pr-4 py-2 border border-ink/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-green/50"
-      />
-    </div>
+        Mit Google anmelden
+      </a>
+    {/if}
   </div>
   
-  {#if error}
-    <div class="bg-red-100/50 border border-red-400/50 text-red-700 px-4 py-3 rounded mb-4">
-      {error}
-      {#if error.includes('Google')}
-        <a href="/api/auth/google?action=login" class="ml-2 underline">Mit Google verbinden</a>
-      {/if}
+  <!-- Tabs -->
+  <div class="flex gap-2 mb-6">
+    <button
+      on:click={() => activeTab = 'table'}
+      class={`px-4 py-2 rounded-lg font-medium transition-colors ${
+        activeTab === 'table' 
+          ? 'bg-accent-green text-white' 
+          : 'bg-ink/10 text-ink/60 hover:bg-ink/20'
+      }`}
+    >
+      Belege-Übersicht
+    </button>
+    <button
+      on:click={() => activeTab = 'drive'}
+      class={`px-4 py-2 rounded-lg font-medium transition-colors ${
+        activeTab === 'drive' 
+          ? 'bg-accent-green text-white' 
+          : 'bg-ink/10 text-ink/60 hover:bg-ink/20'
+      }`}
+    >
+      Drive Upload
+    </button>
+  </div>
+  
+  {#if error && !isAuthenticated}
+    <div class="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+      <p class="text-amber-800">
+        Um Belege hochzuladen und zu verwalten, müssen Sie sich zuerst mit Google anmelden.
+      </p>
     </div>
   {/if}
   
   {#if activeTab === 'table'}
-    <!-- Table View -->
+    <!-- Search -->
+    <div class="mb-6">
+      <div class="relative">
+        <MagnifyingGlass size={20} class="absolute left-3 top-1/2 -translate-y-1/2 text-ink/40" />
+        <input
+          type="text"
+          bind:value={searchQuery}
+          placeholder="Belege durchsuchen..."
+          class="w-full pl-10 pr-4 py-2 border border-ink/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-green/50"
+        />
+      </div>
+    </div>
+    
+    <!-- Receipts Table -->
     {#if loading}
       <div class="flex justify-center py-12">
         <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-accent-green"></div>
@@ -203,12 +280,6 @@
       <div class="text-center py-12">
         <Receipt size={48} class="mx-auto text-ink/30 mb-4" />
         <p class="text-ink/60">Keine Belege gefunden</p>
-        <button
-          on:click={() => activeTab = 'drive'}
-          class="mt-4 px-4 py-2 bg-accent-green text-white rounded-lg hover:bg-accent-green/90"
-        >
-          Beleg hochladen
-        </button>
       </div>
     {:else}
       <div class="bg-white rounded-lg shadow-sm border border-ink/10 overflow-hidden">
@@ -216,48 +287,57 @@
           <thead class="bg-ink/5 text-sm">
             <tr>
               <th class="text-left px-4 py-3">Datum</th>
-              <th class="text-left px-4 py-3">Bezahldatum</th>
-              <th class="text-left px-4 py-3">Händler</th>
-              <th class="text-left px-4 py-3">Rechnungsnummer</th>
+              <th class="text-left px-4 py-3">Lieferant</th>
+              <th class="text-left px-4 py-3">Belegnummer</th>
               <th class="text-right px-4 py-3">Betrag</th>
-              <th class="text-left px-4 py-3">Dateiname</th>
-              <th class="text-center px-4 py-3">Aktionen</th>
+              <th class="text-center px-4 py-3">Status</th>
+              <th class="text-right px-4 py-3">Aktionen</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-ink/10">
             {#each filteredReceipts as receipt}
               <tr class="hover:bg-ink/5 transition-colors">
-                <td class="px-4 py-3 text-sm">{formatDate(receipt.invoice_date)}</td>
-                <td class="px-4 py-3 text-sm">{formatDate(receipt.payment_date)}</td>
-                <td class="px-4 py-3">
-                  <div>
-                    <p class="font-medium">{receipt.vendor}</p>
-                    {#if receipt.category}
-                      <p class="text-xs text-ink/60">{receipt.category}</p>
-                    {/if}
-                  </div>
+                <td class="px-4 py-3">{formatDate(receipt.invoice_date || receipt.created_at)}</td>
+                <td class="px-4 py-3">{receipt.vendor_name || 'Unbekannt'}</td>
+                <td class="px-4 py-3 text-sm text-ink/60">{receipt.invoice_number || '-'}</td>
+                <td class="px-4 py-3 text-right font-mono">
+                  {formatCurrency(receipt.total_amount || 0, receipt.currency)}
                 </td>
-                <td class="px-4 py-3 text-sm font-mono">{receipt.invoice_number || '-'}</td>
-                <td class="px-4 py-3 text-right font-medium">
-                  {formatCurrency(receipt.amount, receipt.currency)}
+                <td class="px-4 py-3 text-center">
+                  <span class={`inline-flex px-2 py-1 text-xs rounded-full ${
+                    receipt.payment_status === 'paid' 
+                      ? 'bg-green-100 text-green-700' 
+                      : 'bg-amber-100 text-amber-700'
+                  }`}>
+                    {receipt.payment_status === 'paid' ? 'Bezahlt' : 'Offen'}
+                  </span>
                 </td>
-                <td class="px-4 py-3 text-sm">{receipt.filename || '-'}</td>
-                <td class="px-4 py-3">
-                  <div class="flex items-center justify-center gap-2">
-                    {#if receipt.drive_file_url}
+                <td class="px-4 py-3 text-right">
+                  <div class="flex justify-end gap-2">
+                    <button
+                      on:click={() => {
+                        previewReceipt = receipt;
+                        showPreview = true;
+                      }}
+                      class="p-1 text-blue-600 hover:bg-blue-50 rounded"
+                      title="Vorschau"
+                    >
+                      <Eye size={18} />
+                    </button>
+                    {#if receipt.file_url}
                       <a
-                        href={receipt.drive_file_url}
+                        href={receipt.file_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        class="p-1 text-ink/60 hover:text-accent-green"
-                        title="In Google Drive öffnen"
+                        class="p-1 text-green-600 hover:bg-green-50 rounded"
+                        title="Download"
                       >
-                        <Eye size={18} />
+                        <Download size={18} />
                       </a>
                     {/if}
                     <button
                       on:click={() => deleteReceipt(receipt.id)}
-                      class="p-1 text-ink/60 hover:text-red-600"
+                      class="p-1 text-red-600 hover:bg-red-50 rounded"
                       title="Löschen"
                     >
                       <Trash size={18} />
@@ -271,121 +351,211 @@
       </div>
     {/if}
   {:else}
-    <!-- Drive Upload View -->
-    <div class="bg-white rounded-lg shadow-sm border border-ink/10 p-6">
-      <div class="mb-6">
-        <label class="block text-sm font-medium mb-2">Beleg hochladen</label>
-        <input
-          type="file"
-          accept="image/*,.pdf"
-          capture="environment"
-          on:change={(e) => selectedFile = e.target.files?.[0] || null}
-          class="w-full px-3 py-2 border border-ink/20 rounded-lg"
-        />
-        <p class="mt-2 text-sm text-ink/60">
-          <Camera size={16} class="inline mr-1" />
-          Auf Mobilgeräten können Sie direkt ein Foto aufnehmen
-        </p>
-      </div>
-      
-      {#if selectedFile}
-        <button
-          on:click={uploadReceipt}
-          disabled={uploading}
-          class="w-full px-4 py-2 bg-accent-green text-white rounded-lg hover:bg-accent-green/90 disabled:opacity-50 flex items-center justify-center gap-2"
-        >
-          {#if uploading}
-            <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-            Wird hochgeladen...
-          {:else}
-            <Upload size={20} />
-            Hochladen & Analysieren
-          {/if}
-        </button>
-      {/if}
-    </div>
-    
-    <!-- Drive Files -->
-    {#if driveFiles.length > 0}
-      <div class="mt-6">
-        <h2 class="text-lg font-semibold mb-2">Belege Eingang - Nicht analysierte Dateien</h2>
-        <p class="text-sm text-ink/60 mb-4">
-          <FolderOpen size={16} class="inline mr-1" />
-          Diese Dateien befinden sich im Eingangsordner und warten auf Analyse
-        </p>
-        <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {#each driveFiles as file}
-            <div class="bg-white rounded-lg shadow-sm border border-ink/10 p-4">
-              <p class="font-medium truncate">{file.name}</p>
-              <p class="text-sm text-ink/60 mb-3">{formatDate(file.modifiedTime)}</p>
+    <!-- Drive Upload Tab -->
+    <div class="space-y-6">
+      <!-- Upload Section -->
+      <div class="bg-white rounded-lg shadow-sm border border-ink/10 p-6">
+        <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+          <Upload size={24} />
+          Beleg hochladen
+        </h3>
+        
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-ink mb-2">
+              Datei auswählen
+            </label>
+            <input
+              type="file"
+              accept="image/*,.pdf"
+              on:change={handleFileSelect}
+              class="w-full px-3 py-2 border border-ink/20 rounded-md"
+              disabled={!isAuthenticated}
+            />
+          </div>
+          
+          {#if selectedFile}
+            <div class="flex items-center justify-between p-3 bg-ink/5 rounded-lg">
+              <span class="text-sm">{selectedFile.name}</span>
               <button
-                on:click={() => analyzeReceipt(file.id, file.name)}
-                disabled={analyzing}
-                class="w-full px-3 py-2 bg-accent-green/10 text-accent-green rounded hover:bg-accent-green/20 disabled:opacity-50 flex items-center justify-center gap-2"
+                on:click={() => selectedFile = null}
+                class="text-red-600 hover:text-red-700"
               >
-                {#if analyzing}
-                  <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-accent-green"></div>
-                {:else}
-                  <Sparkle size={16} />
-                {/if}
-                Mit KI analysieren
+                <X size={18} />
               </button>
             </div>
-          {/each}
+          {/if}
+          
+          <button
+            on:click={uploadReceipt}
+            disabled={!selectedFile || uploading || !isAuthenticated}
+            class="w-full px-4 py-2 bg-accent-green text-white rounded-lg hover:bg-accent-green/90 disabled:bg-ink/30 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          >
+            {#if uploading}
+              <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+              Wird hochgeladen...
+            {:else}
+              <Upload size={20} />
+              Hochladen & Analysieren
+            {/if}
+          </button>
         </div>
       </div>
-    {/if}
+      
+      <!-- Drive Files -->
+      <div class="bg-white rounded-lg shadow-sm border border-ink/10 p-6">
+        <div class="mb-4">
+          <h3 class="text-lg font-semibold mb-2 flex items-center gap-2">
+            <FolderOpen size={24} />
+            Belege in Google Drive
+          </h3>
+          
+          <!-- Breadcrumb Navigation -->
+          {#if folderPath.length > 0}
+            <div class="flex items-center gap-2 text-sm">
+              {#each folderPath as folder, i}
+                <button
+                  on:click={() => navigateToFolder(folder)}
+                  class="text-ink/60 hover:text-accent-green transition-colors"
+                >
+                  {folder.name}
+                </button>
+                {#if i < folderPath.length - 1}
+                  <CaretRight size={14} class="text-ink/40" />
+                {/if}
+              {/each}
+            </div>
+          {/if}
+        </div>
+        
+        <!-- Folders -->
+        {#if driveFolders.length > 0}
+          <div class="mb-4">
+            <p class="text-sm font-medium text-ink/60 mb-2">Ordner</p>
+            <div class="space-y-2">
+              {#each driveFolders as folder}
+                <button
+                  on:click={() => navigateToFolder(folder)}
+                  class="w-full flex items-center gap-3 p-3 border border-ink/10 rounded-lg hover:bg-ink/5 transition-colors text-left"
+                >
+                  <Folder size={20} class="text-amber-600" />
+                  <span class="font-medium">{folder.name}</span>
+                </button>
+              {/each}
+            </div>
+          </div>
+        {/if}
+        
+        <!-- Files -->
+        {#if driveFiles.length === 0 && driveFolders.length === 0}
+          <p class="text-ink/60">Dieser Ordner ist leer</p>
+        {:else if driveFiles.length > 0}
+          <div>
+            <p class="text-sm font-medium text-ink/60 mb-2">Dateien</p>
+          <div class="space-y-2">
+            {#each driveFiles as file}
+              <div class="flex items-center justify-between p-3 border border-ink/10 rounded-lg hover:bg-ink/5">
+                <div class="flex items-center gap-3">
+                  <Receipt size={20} class="text-ink/60" />
+                  <div>
+                    <p class="font-medium">{file.name}</p>
+                    <p class="text-sm text-ink/60">
+                      {new Date(file.createdTime).toLocaleDateString('de-AT')}
+                    </p>
+                  </div>
+                </div>
+                
+                <button
+                  on:click={() => analyzeReceipt(file.id, file.name)}
+                  disabled={analyzing}
+                  class="px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-ink/30 flex items-center gap-2 text-sm"
+                >
+                  {#if analyzing}
+                    <div class="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                  {:else}
+                    <Sparkle size={16} />
+                  {/if}
+                  Analysieren
+                </button>
+              </div>
+            {/each}
+          </div>
+          </div>
+        {/if}
+      </div>
+    </div>
   {/if}
 </div>
 
-<!-- Preview Modal -->
+<!-- Receipt Preview Modal -->
 {#if showPreview && previewReceipt}
-  <div class="fixed inset-0 bg-ink/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-    <div class="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-      <div class="flex items-center justify-between p-4 border-b border-ink/10">
-        <h3 class="font-semibold">Beleg Details</h3>
+  <div class="fixed inset-0 bg-ink/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 shadow-xl">
+      <div class="flex justify-between items-start mb-4">
+        <h2 class="text-xl font-bold">Beleg-Details</h2>
         <button
-          on:click={() => showPreview = false}
-          class="p-2 rounded-lg hover:bg-ink/5"
+          on:click={() => {
+            showPreview = false;
+            previewReceipt = null;
+          }}
+          class="p-1 hover:bg-ink/10 rounded"
         >
-          <X size={20} />
+          <X size={24} />
         </button>
       </div>
       
-      <div class="flex-1 overflow-auto p-6">
-        <dl class="grid grid-cols-2 gap-4">
+      <div class="space-y-4">
+        <div class="grid grid-cols-2 gap-4">
           <div>
-            <dt class="text-sm text-ink/60">Händler</dt>
-            <dd class="font-medium">{previewReceipt.vendor}</dd>
+            <p class="text-sm text-ink/60">Lieferant</p>
+            <p class="font-medium">{previewReceipt.vendor_name || 'Unbekannt'}</p>
           </div>
           <div>
-            <dt class="text-sm text-ink/60">Rechnungsnummer</dt>
-            <dd class="font-medium">{previewReceipt.invoice_number || '-'}</dd>
+            <p class="text-sm text-ink/60">Belegnummer</p>
+            <p class="font-medium">{previewReceipt.invoice_number || '-'}</p>
           </div>
           <div>
-            <dt class="text-sm text-ink/60">Rechnungsdatum</dt>
-            <dd class="font-medium">{formatDate(previewReceipt.invoice_date)}</dd>
+            <p class="text-sm text-ink/60">Datum</p>
+            <p class="font-medium">{formatDate(previewReceipt.invoice_date || previewReceipt.created_at)}</p>
           </div>
           <div>
-            <dt class="text-sm text-ink/60">Bezahldatum</dt>
-            <dd class="font-medium">{formatDate(previewReceipt.payment_date)}</dd>
+            <p class="text-sm text-ink/60">Betrag</p>
+            <p class="font-medium">{formatCurrency(previewReceipt.total_amount || 0, previewReceipt.currency)}</p>
           </div>
-          <div>
-            <dt class="text-sm text-ink/60">Betrag</dt>
-            <dd class="font-medium text-lg">{formatCurrency(previewReceipt.amount, previewReceipt.currency)}</dd>
-          </div>
-          <div>
-            <dt class="text-sm text-ink/60">Kategorie</dt>
-            <dd class="font-medium">{previewReceipt.category || '-'}</dd>
-          </div>
-        </dl>
+        </div>
         
-        {#if previewReceipt.analysis_confidence}
-          <div class="mt-4 p-3 bg-accent-green/10 rounded">
-            <p class="text-sm">
-              <Sparkle size={16} class="inline mr-1" />
-              KI-Analyse Konfidenz: {Math.round(previewReceipt.analysis_confidence * 100)}%
-            </p>
+        {#if previewReceipt.description}
+          <div>
+            <p class="text-sm text-ink/60">Beschreibung</p>
+            <p>{previewReceipt.description}</p>
+          </div>
+        {/if}
+        
+        {#if previewReceipt.line_items && previewReceipt.line_items.length > 0}
+          <div>
+            <p class="text-sm text-ink/60 mb-2">Positionen</p>
+            <div class="border border-ink/10 rounded-lg overflow-hidden">
+              <table class="w-full text-sm">
+                <thead class="bg-ink/5">
+                  <tr>
+                    <th class="text-left px-3 py-2">Beschreibung</th>
+                    <th class="text-right px-3 py-2">Menge</th>
+                    <th class="text-right px-3 py-2">Preis</th>
+                    <th class="text-right px-3 py-2">Gesamt</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-ink/10">
+                  {#each previewReceipt.line_items as item}
+                    <tr>
+                      <td class="px-3 py-2">{item.description}</td>
+                      <td class="px-3 py-2 text-right">{item.quantity}</td>
+                      <td class="px-3 py-2 text-right">{formatCurrency(item.unit_price, previewReceipt.currency)}</td>
+                      <td class="px-3 py-2 text-right">{formatCurrency(item.total_price, previewReceipt.currency)}</td>
+                    </tr>
+                  {/each}
+                </tbody>
+              </table>
+            </div>
           </div>
         {/if}
       </div>

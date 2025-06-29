@@ -3,13 +3,17 @@ import type { RequestHandler } from './$types';
 import { initializeGoogleAuth } from '$lib/server/google-oauth';
 import { google } from 'googleapis';
 
-const RECEIPTS_FOLDER_NAME = 'MGA Portal - Belege';
-
-export const GET: RequestHandler = async ({ cookies }) => {
+export const GET: RequestHandler = async ({ url, cookies }) => {
   try {
+    const folderId = url.searchParams.get('folderId');
+    
+    if (!folderId) {
+      return json({ error: 'Folder ID required' }, { status: 400 });
+    }
+    
     // Get Google auth tokens
-    const accessToken = cookies.get('google_access_token');
-    const refreshToken = cookies.get('google_refresh_token');
+    const accessToken = cookies.get('google_access_token') || process.env.GOOGLE_ACCESS_TOKEN;
+    const refreshToken = cookies.get('google_refresh_token') || process.env.GOOGLE_REFRESH_TOKEN;
     
     if (!accessToken) {
       return json({ error: 'Not authenticated with Google' }, { status: 401 });
@@ -19,30 +23,31 @@ export const GET: RequestHandler = async ({ cookies }) => {
     const auth = initializeGoogleAuth(accessToken, refreshToken);
     const drive = google.drive({ version: 'v3', auth });
     
-    // Search for receipts folder
-    const searchResponse = await drive.files.list({
-      q: `name='${RECEIPTS_FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
-      fields: 'files(id, name)',
-      spaces: 'drive'
+    // List folders
+    const foldersResponse = await drive.files.list({
+      q: `'${folderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+      fields: 'files(id, name, createdTime, modifiedTime)',
+      orderBy: 'name',
+      pageSize: 100
     });
     
-    if (searchResponse.data.files && searchResponse.data.files.length > 0) {
-      // Folder exists
-      return json(searchResponse.data.files[0]);
-    }
-    
-    // Create folder if it doesn't exist
-    const createResponse = await drive.files.create({
-      requestBody: {
-        name: RECEIPTS_FOLDER_NAME,
-        mimeType: 'application/vnd.google-apps.folder'
-      },
-      fields: 'id, name'
+    // List files
+    const filesResponse = await drive.files.list({
+      q: `'${folderId}' in parents and trashed=false and (mimeType contains 'image/' or mimeType='application/pdf')`,
+      fields: 'files(id, name, mimeType, size, createdTime, modifiedTime, webViewLink, webContentLink, thumbnailLink)',
+      orderBy: 'createdTime desc',
+      pageSize: 100
     });
     
-    return json(createResponse.data);
-  } catch (error) {
-    console.error('Error managing receipts folder:', error);
-    return json({ error: 'Failed to manage receipts folder' }, { status: 500 });
+    return json({
+      folders: foldersResponse.data.files || [],
+      files: filesResponse.data.files || []
+    });
+  } catch (error: any) {
+    console.error('Error fetching folder contents:', error);
+    return json({ 
+      error: 'Failed to fetch folder contents',
+      details: error.message 
+    }, { status: 500 });
   }
 };
