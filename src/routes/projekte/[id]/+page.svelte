@@ -113,20 +113,11 @@
       <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {#if project.drive_folder_url}
           <a
-            href={project.drive_folder_url}
-            target="_blank"
-            class="flex items-center justify-center gap-3 p-4 bg-white rounded-lg shadow-sm border border-ink/10 hover:shadow-md transition-shadow"
-          >
-            <GoogleDriveLogo size={24} weight="fill" class="text-ink/60" />
-            <span>Google Drive</span>
-          </a>
-          
-          <a
             href="/projekte/{project.id}/drive"
             class="flex items-center justify-center gap-3 p-4 bg-white rounded-lg shadow-sm border border-ink/10 hover:shadow-md transition-shadow"
           >
             <Folder size={24} class="text-ink/60" />
-            <span>Dateien</span>
+            <span>Drive Browser</span>
           </a>
         {/if}
         
