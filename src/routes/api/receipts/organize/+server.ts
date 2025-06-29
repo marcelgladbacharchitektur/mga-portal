@@ -10,9 +10,13 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
     
     console.log('Receipt organize request:', { fileId, invoiceDate, vendor, amount, invoiceNumber });
     
-    if (!fileId || !invoiceDate) {
-      return json({ error: 'File ID and invoice date required' }, { status: 400 });
+    if (!fileId) {
+      return json({ error: 'File ID required' }, { status: 400 });
     }
+    
+    // Use current date if invoice date is not provided
+    const finalInvoiceDate = invoiceDate || new Date().toISOString().split('T')[0];
+    console.log('Using invoice date:', finalInvoiceDate);
     
     // Get settings for the correct archive folder
     const settings = await getSettings();
@@ -43,7 +47,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
     const drive = google.drive({ version: 'v3', auth });
     
     // Parse the invoice date
-    const date = new Date(invoiceDate);
+    const date = new Date(finalInvoiceDate);
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const monthName = date.toLocaleDateString('de-AT', { month: 'long' });
@@ -113,7 +117,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
     
     // Generate new filename
     const fileExtension = fileMetadata.data.name?.split('.').pop() || 'pdf';
-    const dateStr = new Date(invoiceDate).toISOString().split('T')[0];
+    const dateStr = new Date(finalInvoiceDate).toISOString().split('T')[0];
     const cleanVendor = vendor ? vendor.replace(/[^a-zA-Z0-9äöüÄÖÜß\s]/g, '').substring(0, 30) : 'Unbekannt';
     const amountStr = amount ? amount.toFixed(2).replace('.', ',') : '0,00';
     const invoiceStr = invoiceNumber ? `_${invoiceNumber.replace(/[^a-zA-Z0-9]/g, '')}` : '';
@@ -123,6 +127,16 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
     
     // Move file to the month folder and rename
     const previousParents = fileMetadata.data.parents?.join(',') || '';
+    
+    console.log('Generated filename details:', {
+      originalInvoiceDate: invoiceDate,
+      finalInvoiceDate,
+      dateStr,
+      cleanVendor,
+      amountStr,
+      invoiceStr,
+      newFileName
+    });
     
     console.log('Moving file:', {
       fileId,

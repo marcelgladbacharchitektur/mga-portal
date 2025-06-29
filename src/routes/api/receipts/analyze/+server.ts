@@ -115,8 +115,12 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
     if (error) throw error;
     
     // Organize the file into year/month folders
-    if (receipt && analysis.invoiceDate) {
+    if (receipt) {
       try {
+        // Use invoice date if available, otherwise use current date
+        const dateToUse = analysis.invoiceDate || new Date().toISOString().split('T')[0];
+        
+        console.log('Organizing receipt with date:', dateToUse);
         const organizeResponse = await fetch(`${request.url.origin}/api/receipts/organize`, {
           method: 'POST',
           headers: {
@@ -125,7 +129,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
           },
           body: JSON.stringify({
             fileId: fileId,
-            invoiceDate: analysis.invoiceDate,
+            invoiceDate: dateToUse,
             vendor: analysis.vendor,
             amount: analysis.totalAmount || analysis.amount,
             invoiceNumber: analysis.invoiceNumber
@@ -133,7 +137,11 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
         });
         
         if (!organizeResponse.ok) {
-          console.error('Failed to organize receipt:', await organizeResponse.text());
+          const errorText = await organizeResponse.text();
+          console.error('Failed to organize receipt:', errorText);
+        } else {
+          const organizeResult = await organizeResponse.json();
+          console.log('Receipt organized successfully:', organizeResult);
         }
       } catch (orgError) {
         console.error('Error organizing receipt:', orgError);
